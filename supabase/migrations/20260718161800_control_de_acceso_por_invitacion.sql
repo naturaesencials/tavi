@@ -53,3 +53,9 @@ create policy "invitados: solo el propietario invita" on public.invitados for in
   with check (public.es_propietario());
 create policy "invitados: solo el propietario retira invitaciones" on public.invitados for delete to authenticated
   using (public.es_propietario());
+
+-- Endurecido: las funciones no se exponen por la API REST.
+revoke execute on function public.crear_perfil_si_invitado() from public, anon, authenticated;
+grant execute on function public.crear_perfil_si_invitado() to supabase_auth_admin;
+revoke execute on function public.es_propietario() from public, anon;
+grant execute on function public.es_propietario() to authenticated;
