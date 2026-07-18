@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --pino: #14312a;
+  --pino-claro: #2c5347;
+  --hueso: #eff1ea;
+  --hueso-hondo: #e3e6db;
+  --ocre: #c9a227;
+  --rosa: #d9b8b1;
+  --tinta: #101915;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--hueso);
+  color: var(--pino);
+  font-feature-settings: 'ss01';
+}
+
+::selection {
+  background: var(--ocre);
+  color: var(--pino);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ocre);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
