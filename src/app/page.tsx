@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { salir } from './login/actions'
 
@@ -24,6 +25,12 @@ export default async function Inicio() {
         <span className="font-cuerpo text-[0.85rem] text-pino/60">
           {user?.email ?? 'sin sesión'}
         </span>
+        <Link
+          href="/cuenta"
+          className="font-cuerpo text-[0.85rem] font-medium text-pino underline underline-offset-4 hover:text-ocre"
+        >
+          Tu cuenta
+        </Link>
         <form action={salir}>
           <button
             type="submit"
