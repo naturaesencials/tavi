@@ -39,58 +39,7 @@ const ACENTO: Record<string, string> = {
 const proporcion = (im: FotoHoja) =>
   im.ancho && im.alto ? im.ancho / im.alto : 1.4
 
-type Fila = { fotos: FotoHoja[]; suma: number }
-
-function repartirEnFilas(
-  imagenes: FotoHoja[],
-  objetivo: number,
-  maxPorFila: number
-): Fila[] {
-  const filas: FotoHoja[][] = []
-  let actual: FotoHoja[] = []
-  let suma = 0
-  for (const im of imagenes) {
-    actual.push(im)
-    suma += proporcion(im)
-    if (suma >= objetivo || actual.length >= maxPorFila) {
-      filas.push(actual)
-      actual = []
-      suma = 0
-    }
-  }
-  if (actual.length) filas.push(actual)
-  return filas.map((f) => ({
-    fotos: f,
-    suma: f.reduce((tot, im) => tot + proporcion(im), 0),
-  }))
-}
-
-/** Altura de las filas medida en anchos de página: una fila de proporción s
- *  mide 1/s de ancho. Sirve para saber si el bloque de fotos cabe. */
-const alturaRelativa = (filas: Fila[]) =>
-  filas.reduce((t, f) => t + 1 / f.suma, 0)
-
-/** Busca el reparto más suelto que quepa en el presupuesto de altura. Así
- *  nunca hay que encoger una fila, que es lo que recortaba las fotos. */
-function repartoQueCabe(
-  imagenes: FotoHoja[],
-  presupuesto: number,
-  minFilas: number
-) {
-  const candidatos: number[] = [2.0, 2.4, 2.8, 3.2, 3.7, 4.3, 5.0, 6.0, 7.5]
-  let respaldo = { filas: repartirEnFilas(imagenes, 7.5, 4), objetivo: 7.5 }
-  for (const obj of candidatos) {
-    const filas = repartirEnFilas(imagenes, obj, obj > 4 ? 4 : 3)
-    if (alturaRelativa(filas) > presupuesto) continue
-    respaldo = { filas, objetivo: obj }
-    // Con varias fotos se busca más de una fila: es lo que permite que el
-    // texto se meta entre medias en vez de quedarse todo al pie.
-    if (filas.length >= minFilas) return { filas, objetivo: obj }
-  }
-  return respaldo
-}
-
-/** Trocea el texto para que haya al menos un bloque por cada fila de fotos,
+/** Trocea el texto para que haya al menos un bloque por foto emparejada,
  *  partiendo por frases cuando no hay párrafos suficientes. */
 function trocear(parrafos: string[], minimo: number) {
   const trozos = [...parrafos]
@@ -109,6 +58,75 @@ function trocear(parrafos: string[], minimo: number) {
     )
   }
   return trozos
+}
+
+type Banda =
+  | { clase: 'pareja'; fotos: FotoHoja[]; texto: string; ladoFoto: 'izq' | 'der' }
+  | { clase: 'fotos'; fotos: FotoHoja[] }
+  | { clase: 'texto'; texto: string }
+
+/** Empareja fotos con trozos de historia alternando el lado, como en una
+ *  revista. Las fotos que no entran en pareja bajan a una tira horizontal,
+ *  que ocupa mucha menos altura que otra pareja. */
+function componer(
+  imagenes: FotoHoja[],
+  trozos: string[],
+  parejas: number
+): Banda[] {
+  const bandas: Banda[] = []
+  const n = Math.min(parejas, imagenes.length, trozos.length)
+
+  for (let i = 0; i < n; i++)
+    bandas.push({
+      clase: 'pareja',
+      fotos: [imagenes[i]],
+      texto: trozos[i],
+      ladoFoto: i % 2 === 0 ? 'izq' : 'der',
+    })
+
+  const resto = imagenes.slice(n)
+  if (resto.length) {
+    const porTira = resto.length > 4 ? Math.ceil(resto.length / 2) : resto.length
+    for (let i = 0; i < resto.length; i += porTira)
+      bandas.push({ clase: 'fotos', fotos: resto.slice(i, i + porTira) })
+  }
+
+  for (let i = n; i < trozos.length; i++)
+    bandas.push({ clase: 'texto', texto: trozos[i] })
+
+  return bandas
+}
+
+/** Ancho de una tira suelta: una foto vertical sola no debe comerse media
+ *  página solo porque le sobre sitio a lo ancho. */
+const anchoTira = (suma: number) => Math.min(1, suma / 2.4)
+
+/** Altura estimada de la composición, en anchos de columna. Permite elegir el
+ *  cuerpo de letra y el tamaño de foto más generosos que quepan en la hoja. */
+function altura(
+  bandas: Banda[],
+  fuente: number,
+  anchoFoto: number,
+  hueco: number
+) {
+  const linea = fuente * 1.68
+  let total = 0
+  for (const b of bandas) {
+    if (b.clase === 'fotos') {
+      const suma = b.fotos.reduce((t, im) => t + proporcion(im), 0)
+      total += anchoTira(suma) / suma
+    } else if (b.clase === 'texto') {
+      const porLinea = 1 / (fuente * 0.47)
+      total += Math.ceil(b.texto.length / porLinea) * linea
+    } else {
+      const anchoTexto = 1 - anchoFoto - 0.045
+      const porLinea = anchoTexto / (fuente * 0.47)
+      const hTexto = Math.ceil(b.texto.length / porLinea) * linea
+      const hFoto = anchoFoto / proporcion(b.fotos[0])
+      total += Math.max(hTexto, hFoto)
+    }
+  }
+  return total + hueco * Math.max(0, bandas.length - 1)
 }
 
 function Imagen({
@@ -160,55 +178,6 @@ function Imagen({
   )
 }
 
-function FilaFotos({
-  fila,
-  objetivo,
-  primera,
-  desde,
-  clavePagina,
-  vacio,
-}: {
-  fila: { fotos: FotoHoja[]; suma: number }
-  objetivo: number
-  primera: boolean
-  desde: number
-  clavePagina: string
-  vacio: string
-}) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        gap: '11px',
-        alignItems: 'flex-start',
-        width: `${Math.min(1, fila.suma / objetivo) * 100}%`,
-        flexShrink: 0,
-      }}
-    >
-      {fila.fotos.map((im, i) => (
-        // Cada foto lleva su propia proporción: al repartirse el ancho en
-        // proporción a ella, todas las alturas de la fila salen iguales sin
-        // que los huecos entre fotos falseen el cálculo.
-        <div
-          key={im.id}
-          style={{
-            flex: `${proporcion(im)} 1 0`,
-            aspectRatio: String(proporcion(im)),
-          }}
-        >
-          <Imagen
-            im={im}
-            esPrincipal={primera && i === 0}
-            indice={desde + i}
-            clavePagina={clavePagina}
-            vacio={vacio}
-          />
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export default function Hoja({
   idioma,
   tipo,
@@ -249,46 +218,53 @@ export default function Hoja({
   const medida = (v: number | null, div: number, u: string) =>
     v === null ? '—' : `${(v / div).toLocaleString('es-ES')} ${u}`
 
-  const largo = (texto ?? '').length
   const qrs = imagenes.filter((im) => im.medio === 'video' && im.qr)
 
-  // Cuánta página pueden ocupar las fotos, en anchos de página. La hoja mide
-  // 1,414 anchos de alto; lo que no se lleven las fotos es para el texto.
-  let presupuesto =
-    largo === 0 ? 1.0 : largo < 400 ? 0.78 : largo < 900 ? 0.62 : largo < 1500 ? 0.46 : 0.34
-  if (esSemana) presupuesto -= 0.1
-  if (nota) presupuesto -= 0.1
-  if (qrs.length) presupuesto -= 0.06
-  presupuesto = Math.max(presupuesto, 0.22)
+  // Presupuesto de altura del cuerpo, en anchos de columna. Lo que se llevan
+  // cabecera, pie, medidas y nota se descuenta de aquí.
+  let disponible = 1.2
+  if (esSemana) disponible -= 0.11
+  if (nota) disponible -= 0.15
+  if (qrs.length) disponible -= 0.07
 
-  const minFilas = imagenes.length >= 3 && largo > 200 ? 2 : 1
-  const { filas, objetivo } = repartoQueCabe(imagenes, presupuesto, minFilas)
-  const parrafos = trocear(
-    (texto ?? '').split('\n\n').filter(Boolean),
-    filas.length
-  )
+  const parrafos = (texto ?? '').split('\n\n').filter(Boolean)
 
-  const cuerpo =
-    largo > 1700
-      ? '0.72rem'
-      : largo > 1300
-        ? '0.77rem'
-        : largo > 900
-          ? '0.82rem'
-          : largo > 500
-            ? '0.86rem'
-            : '0.95rem'
+  // Se prueban composiciones de más generosa a más apretada y se toma la
+  // primera que entra: primero muchas parejas, luego fotos grandes, luego
+  // letra grande. Lo que no cabe en pareja baja a una tira horizontal.
+  const FUENTES = [0.03, 0.0282, 0.0265, 0.025, 0.0235, 0.022, 0.0206, 0.0192, 0.0178]
+  const ANCHOS = [0.58, 0.54, 0.5, 0.46, 0.42, 0.38]
+  const HUECO = 0.035
+  const maxParejas = Math.min(3, imagenes.length)
 
-  // El texto se cuela entre las filas de fotos: una foto, un trozo de
-  // historia, otra foto. Lo que sobra baja al final a dos columnas.
-  const bloques: { clase: 'fotos' | 'texto'; i: number }[] = []
-  const total = Math.max(filas.length, parrafos.length)
-  for (let i = 0; i < total; i++) {
-    if (i < filas.length) bloques.push({ clase: 'fotos', i })
-    if (i < parrafos.length) bloques.push({ clase: 'texto', i })
+  let bandas = componer(imagenes, parrafos, 0)
+  let fuenteRel = FUENTES[FUENTES.length - 1]
+  let anchoFoto = 0.42
+  let mejor = -1
+
+  for (let par = maxParejas; par >= 0; par--) {
+    const trozos = trocear(parrafos, Math.max(par, 1))
+    const cand = componer(imagenes, trozos, par)
+    for (const an of ANCHOS) {
+      for (const fu of FUENTES) {
+        const h = altura(cand, fu, an, HUECO)
+        if (h > disponible) continue
+        // Se premia llenar la hoja y, a igualdad, tener más parejas de foto
+        // y texto, que es la estructura que se busca.
+        const nota = h + par * 0.06
+        if (nota > mejor) {
+          mejor = nota
+          bandas = cand
+          anchoFoto = an
+          fuenteRel = fu
+        }
+      }
+    }
   }
 
-  const columnas = largo > 900 ? 3 : largo > 380 ? 2 : 1
+  // De fracción de columna a rem: la columna mide 46,8rem de ancho máximo.
+  const cuerpoRem = `${(fuenteRel * 46.8).toFixed(2)}rem`
+
 
   return (
     <article
@@ -373,44 +349,123 @@ export default function Hoja({
 
         <div
           style={{
-            marginTop: '3%',
+            marginTop: '3.2%',
             display: 'flex',
             flexDirection: 'column',
-            gap: '2.4%',
+            gap: `${HUECO * 100}%`,
             flex: 1,
             minHeight: 0,
+            justifyContent: 'space-between',
           }}
         >
-          {bloques.map((b) =>
-            b.clase === 'fotos' ? (
-              <FilaFotos
-                key={`f${b.i}`}
-                fila={filas[b.i]}
-                objetivo={objetivo}
-                primera={b.i === 0}
-                desde={filas
-                  .slice(0, b.i)
-                  .reduce((n, f) => n + f.fotos.length, 0)}
-                clavePagina={titulo}
-                vacio={t.hueco}
-              />
-            ) : (
-              <p
-                key={`t${b.i}`}
+          {bandas.map((b, i) => {
+            const desde = bandas
+              .slice(0, i)
+              .reduce(
+                (n, x) => n + (x.clase === 'texto' ? 0 : x.fotos.length),
+                0
+              )
+
+            if (b.clase === 'texto')
+              return (
+                <p
+                  key={`t${i}`}
+                  style={{
+                    fontSize: cuerpoRem,
+                    lineHeight: 1.68,
+                    textAlign: 'justify',
+                    hyphens: 'auto',
+                    margin: 0,
+                  }}
+                >
+                  {b.texto}
+                </p>
+              )
+
+            if (b.clase === 'fotos')
+              return (
+                <div
+                  key={`f${i}`}
+                  style={{
+                    display: 'flex',
+                    gap: '3%',
+                    alignItems: 'flex-start',
+                    width: `${anchoTira(b.fotos.reduce((t, im) => t + proporcion(im), 0)) * 100}%`,
+                    alignSelf: i % 2 === 1 ? 'flex-end' : 'flex-start',
+                  }}
+                >
+                  {b.fotos.map((im, j) => (
+                    <div
+                      key={im.id}
+                      style={{
+                        flex: `${proporcion(im)} 1 0`,
+                        aspectRatio: String(proporcion(im)),
+                      }}
+                    >
+                      <Imagen
+                        im={im}
+                        esPrincipal={false}
+                        indice={desde + j}
+                        clavePagina={titulo}
+                        vacio={t.hueco}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )
+
+            const columna = (
+              <div
                 style={{
-                  fontSize: cuerpo,
-                  lineHeight: 1.55,
-                  columnCount: parrafos[b.i].length > 260 ? columnas : 1,
-                  columnGap: '18px',
-                  margin: 0,
+                  width: `${anchoFoto * 100}%`,
+                  flexShrink: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4%',
                 }}
               >
-                {parrafos[b.i]}
+                {b.fotos.map((im, j) => (
+                  <div key={im.id} style={{ aspectRatio: String(proporcion(im)) }}>
+                    <Imagen
+                      im={im}
+                      esPrincipal={i === 0 && j === 0}
+                      indice={desde + j}
+                      clavePagina={titulo}
+                      vacio={t.hueco}
+                    />
+                  </div>
+                ))}
+              </div>
+            )
+
+            const cuerpoTexto = (
+              <p
+                style={{
+                  flex: 1,
+                  fontSize: cuerpoRem,
+                  lineHeight: 1.68,
+                  textAlign: 'justify',
+                  hyphens: 'auto',
+                  margin: 0,
+                  alignSelf: 'center',
+                }}
+              >
+                {b.texto}
               </p>
             )
-          )}
 
-          {parrafos.length === 0 && imagenes.length === 0 && (
+            return (
+              <div
+                key={`p${i}`}
+                style={{ display: 'flex', gap: '4.5%', alignItems: 'center' }}
+              >
+                {b.ladoFoto === 'izq' ? columna : cuerpoTexto}
+                {b.ladoFoto === 'izq' ? cuerpoTexto : columna}
+              </div>
+            )
+          })}
+
+          {bandas.length === 0 && (
             <p style={{ fontSize: '0.88rem', color: SUAVE, fontStyle: 'italic' }}>
               {t.sinCuento}
             </p>
