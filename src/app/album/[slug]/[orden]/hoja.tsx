@@ -6,16 +6,20 @@ const APAGADO = '#8C7A55'
 const ROJO = '#C0512F'
 const VERDE = '#2E6E5E'
 
+import { T, type Idioma } from '@/lib/idioma'
+
 function Hueco({
   ancho,
   alto,
   giro,
   pie,
+  vacio,
 }: {
   ancho: string
   alto: string
   giro: number
   pie: string
+  vacio: string
 }) {
   return (
     <figure
@@ -39,7 +43,7 @@ function Hueco({
         <span
           style={{ color: '#8E8B7F', fontSize: '0.72rem', letterSpacing: '1px' }}
         >
-          hueco para foto
+          {vacio}
         </span>
       </div>
       <figcaption
@@ -70,6 +74,7 @@ function Hueco({
 }
 
 export default function Hoja({
+  idioma,
   encabezado,
   titulo,
   subtitulo,
@@ -83,6 +88,7 @@ export default function Hoja({
   fotos,
   pie,
 }: {
+  idioma: Idioma
   encabezado: string
   titulo: string
   subtitulo: string
@@ -96,6 +102,7 @@ export default function Hoja({
   fotos: number
   pie: string
 }) {
+  const t = T[idioma]
   const medida = (v: number | null, div: number, unidad: string) =>
     v === null ? '—' : `${(v / div).toLocaleString('es-ES')} ${unidad}`
 
@@ -156,11 +163,24 @@ export default function Hoja({
           ancho="100%"
           alto="14rem"
           giro={-1.2}
-          pie={semana ? `La manta dice: ${semana} semanas` : 'Foto principal'}
+          vacio={t.hueco}
+          pie={semana ? t.manta(semana) : t.principal}
         />
         <div style={{ display: 'grid', gap: '10%' }}>
-          <Hueco ancho="100%" alto="5.4rem" giro={1} pie="Segunda foto" />
-          <Hueco ancho="100%" alto="5.4rem" giro={-0.8} pie="Tercera foto" />
+          <Hueco
+            ancho="100%"
+            alto="5.4rem"
+            giro={1}
+            pie={t.segunda}
+            vacio={t.hueco}
+          />
+          <Hueco
+            ancho="100%"
+            alto="5.4rem"
+            giro={-0.8}
+            pie={t.tercera}
+            vacio={t.hueco}
+          />
         </div>
       </div>
 
@@ -180,7 +200,7 @@ export default function Hoja({
             textTransform: 'uppercase',
           }}
         >
-          Parte del explorador
+          {t.parte}
         </p>
         <div
           style={{
@@ -191,9 +211,15 @@ export default function Hoja({
             fontSize: '1rem',
           }}
         >
-          <span>Peso {medida(pesoG, 1000, 'kg')}</span>
-          <span>Talla {medida(tallaMm, 10, 'cm')}</span>
-          <span>Cabeza {medida(cabezaMm, 10, 'cm')}</span>
+          <span>
+            {t.peso} {medida(pesoG, 1000, 'kg')}
+          </span>
+          <span>
+            {t.talla} {medida(tallaMm, 10, 'cm')}
+          </span>
+          <span>
+            {t.cabeza} {medida(cabezaMm, 10, 'cm')}
+          </span>
         </div>
       </section>
 
@@ -204,7 +230,7 @@ export default function Hoja({
           </p>
         ) : (
           <p style={{ fontSize: '0.95rem', color: APAGADO, fontStyle: 'italic' }}>
-            Aquí irá el cuento de esta semana.
+            {t.sinCuento}
           </p>
         )}
       </section>
@@ -226,7 +252,7 @@ export default function Hoja({
               textTransform: 'uppercase',
             }}
           >
-            Mientras tanto, en el mundo
+            {t.mundo}
           </p>
           {nota ? (
             <>
@@ -251,7 +277,7 @@ export default function Hoja({
                 fontStyle: 'italic',
               }}
             >
-              Esta semana no tiene nota del mundo.
+              {t.sinMundo}
             </p>
           )}
         </div>
@@ -265,7 +291,7 @@ export default function Hoja({
               textTransform: 'uppercase',
             }}
           >
-            Notas de la familia
+            {t.familia}
           </p>
           <p
             style={{
@@ -275,8 +301,7 @@ export default function Hoja({
               fontStyle: 'italic',
             }}
           >
-            Los comentarios aparecerán aquí, firmados con el nombre de quien los
-            escribe.
+            {t.sinFamilia}
           </p>
         </div>
       </div>
@@ -290,8 +315,10 @@ export default function Hoja({
           fontSize: '0.7rem',
         }}
       >
-        <span>{pie} · Portland, Oregón</span>
-        <span>{semana ? `${semana} / 52` : `${fotos} fotos`}</span>
+        <span>
+          {pie} · Portland, {idioma === 'en' ? 'Oregon' : 'Oregón'}
+        </span>
+        <span>{semana ? `${semana} / 52` : t.fotos(fotos)}</span>
       </footer>
     </article>
   )

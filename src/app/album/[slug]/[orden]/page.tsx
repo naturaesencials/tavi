@@ -1,15 +1,21 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { fechaLarga, rango } from '@/lib/fechas'
+import { fechaLarga, fechaLargaEn, rango, rangoEn } from '@/lib/fechas'
+import { elige, leerIdioma, T } from '@/lib/idioma'
 import type { Album, Foto, Pagina } from '@/lib/tipos'
 import Hoja from './hoja'
 
 export default async function PaginaAlbum({
   params,
+  searchParams,
 }: {
   params: { slug: string; orden: string }
+  searchParams: { idioma?: string }
 }) {
+  const idioma = leerIdioma(searchParams.idioma)
+  const t = T[idioma]
+  const otro = idioma === 'es' ? 'en' : 'es'
   const orden = Number(params.orden)
   if (!Number.isInteger(orden)) notFound()
 
@@ -48,48 +54,58 @@ export default async function PaginaAlbum({
 
   const encabezado =
     pagina.tipo === 'semana'
-      ? 'Cuaderno de expedición'
+      ? t.cuaderno
       : pagina.tipo === 'ciudad'
-        ? 'El mapa'
+        ? t.mapa
         : pagina.tipo === 'nacimiento'
-          ? 'El primer día'
+          ? t.primerDia
           : pagina.tipo === 'embarazo'
-            ? 'Antes del viaje'
+            ? t.antes
             : pagina.tipo === 'cumple'
-              ? 'Fin del primer año'
-              : 'El álbum'
+              ? t.finAno
+              : t.album
 
   const subtitulo =
     pagina.fecha_inicio && pagina.fecha_fin
-      ? rango(pagina.fecha_inicio, pagina.fecha_fin)
+      ? idioma === 'en'
+        ? rangoEn(pagina.fecha_inicio, pagina.fecha_fin)
+        : rango(pagina.fecha_inicio, pagina.fecha_fin)
       : pagina.fecha_inicio
-        ? fechaLarga(pagina.fecha_inicio)
-        : (album.subtitulo ?? '')
+        ? idioma === 'en'
+          ? fechaLargaEn(pagina.fecha_inicio)
+          : fechaLarga(pagina.fecha_inicio)
+        : (elige(album.subtitulo, album.subtitulo_en, idioma) ?? '')
 
   return (
     <main className="mx-auto min-h-dvh max-w-5xl px-4 py-10">
       <nav className="mb-8 flex items-center justify-between gap-4">
         <Link
-          href={`/album/${album.slug}`}
+          href={`/album/${album.slug}?idioma=${idioma}`}
           className="text-[0.72rem] font-bold uppercase tracking-[0.2em] text-pino/50 hover:text-ocre"
         >
-          ← Índice
+          ← {t.indice}
         </Link>
         <div className="flex items-center gap-4 text-[0.85rem]">
+          <Link
+            href={`/album/${album.slug}/${orden}?idioma=${otro}`}
+            className="text-[0.72rem] font-bold uppercase tracking-[0.2em] text-ocre hover:text-pino"
+          >
+            {t.otroIdioma}
+          </Link>
           {orden > 0 && (
             <Link
-              href={`/album/${album.slug}/${orden - 1}`}
+              href={`/album/${album.slug}/${orden - 1}?idioma=${idioma}`}
               className="text-pino underline underline-offset-4 hover:text-ocre"
             >
-              Anterior
+              {t.anterior}
             </Link>
           )}
           {orden < ultima && (
             <Link
-              href={`/album/${album.slug}/${orden + 1}`}
+              href={`/album/${album.slug}/${orden + 1}?idioma=${idioma}`}
               className="text-pino underline underline-offset-4 hover:text-ocre"
             >
-              Siguiente
+              {t.siguiente}
             </Link>
           )}
         </div>
@@ -97,22 +113,30 @@ export default async function PaginaAlbum({
 
       <Hoja
         encabezado={encabezado}
-        titulo={pagina.titulo ?? album.titulo}
+        idioma={idioma}
+        titulo={
+          elige(pagina.titulo, pagina.titulo_en, idioma) ??
+          elige(album.titulo, album.titulo_en, idioma) ??
+          ''
+        }
         subtitulo={subtitulo}
-        texto={pagina.texto_cuento}
-        notaTitulo={pagina.nota_mundo_titulo}
-        nota={pagina.nota_mundo}
+        texto={elige(pagina.texto_cuento, pagina.texto_cuento_en, idioma)}
+        notaTitulo={elige(
+          pagina.nota_mundo_titulo,
+          pagina.nota_mundo_titulo_en,
+          idioma
+        )}
+        nota={elige(pagina.nota_mundo, pagina.nota_mundo_en, idioma)}
         pesoG={pagina.peso_g}
         tallaMm={pagina.talla_mm}
         cabezaMm={pagina.cabeza_mm}
         semana={pagina.numero_semana}
         fotos={(fotos ?? []).length}
-        pie={album.titulo}
+        pie={elige(album.titulo, album.titulo_en, idioma) ?? ''}
       />
 
       <p className="mt-6 text-center text-[0.8rem] text-pino/50">
-        Los huecos se rellenan al subir las fotos. Las medidas y el texto se
-        editan desde aquí en cuanto esté el editor.
+        {t.aviso}
       </p>
     </main>
   )
