@@ -39,14 +39,20 @@ const ACENTO: Record<string, string> = {
 const proporcion = (im: FotoHoja) =>
   im.ancho && im.alto ? im.ancho / im.alto : 1.4
 
-function repartirEnFilas(imagenes: FotoHoja[], objetivo: number) {
+type Fila = { fotos: FotoHoja[]; suma: number }
+
+function repartirEnFilas(
+  imagenes: FotoHoja[],
+  objetivo: number,
+  maxPorFila: number
+): Fila[] {
   const filas: FotoHoja[][] = []
   let actual: FotoHoja[] = []
   let suma = 0
   for (const im of imagenes) {
     actual.push(im)
     suma += proporcion(im)
-    if (suma >= objetivo) {
+    if (suma >= objetivo || actual.length >= maxPorFila) {
       filas.push(actual)
       actual = []
       suma = 0
@@ -57,6 +63,52 @@ function repartirEnFilas(imagenes: FotoHoja[], objetivo: number) {
     fotos: f,
     suma: f.reduce((tot, im) => tot + proporcion(im), 0),
   }))
+}
+
+/** Altura de las filas medida en anchos de página: una fila de proporción s
+ *  mide 1/s de ancho. Sirve para saber si el bloque de fotos cabe. */
+const alturaRelativa = (filas: Fila[]) =>
+  filas.reduce((t, f) => t + 1 / f.suma, 0)
+
+/** Busca el reparto más suelto que quepa en el presupuesto de altura. Así
+ *  nunca hay que encoger una fila, que es lo que recortaba las fotos. */
+function repartoQueCabe(
+  imagenes: FotoHoja[],
+  presupuesto: number,
+  minFilas: number
+) {
+  const candidatos: number[] = [2.0, 2.4, 2.8, 3.2, 3.7, 4.3, 5.0, 6.0, 7.5]
+  let respaldo = { filas: repartirEnFilas(imagenes, 7.5, 4), objetivo: 7.5 }
+  for (const obj of candidatos) {
+    const filas = repartirEnFilas(imagenes, obj, obj > 4 ? 4 : 3)
+    if (alturaRelativa(filas) > presupuesto) continue
+    respaldo = { filas, objetivo: obj }
+    // Con varias fotos se busca más de una fila: es lo que permite que el
+    // texto se meta entre medias en vez de quedarse todo al pie.
+    if (filas.length >= minFilas) return { filas, objetivo: obj }
+  }
+  return respaldo
+}
+
+/** Trocea el texto para que haya al menos un bloque por cada fila de fotos,
+ *  partiendo por frases cuando no hay párrafos suficientes. */
+function trocear(parrafos: string[], minimo: number) {
+  const trozos = [...parrafos]
+  while (trozos.length < minimo) {
+    let i = 0
+    for (let j = 1; j < trozos.length; j++)
+      if (trozos[j].length > trozos[i].length) i = j
+    const frases = trozos[i].match(/[^.!?]+[.!?]+\s*/g)
+    if (!frases || frases.length < 2) break
+    const mitad = Math.ceil(frases.length / 2)
+    trozos.splice(
+      i,
+      1,
+      frases.slice(0, mitad).join('').trim(),
+      frases.slice(mitad).join('').trim()
+    )
+  }
+  return trozos
 }
 
 function Imagen({
@@ -83,6 +135,7 @@ function Imagen({
   return (
     <Marco id={im.id} estilo={estilo}>
       <div
+        data-foto
         style={{
           width: '100%',
           height: '100%',
@@ -127,13 +180,22 @@ function FilaFotos({
       style={{
         display: 'flex',
         gap: '11px',
-        aspectRatio: String(fila.suma),
+        alignItems: 'flex-start',
         width: `${Math.min(1, fila.suma / objetivo) * 100}%`,
-        minHeight: 0,
+        flexShrink: 0,
       }}
     >
       {fila.fotos.map((im, i) => (
-        <div key={im.id} style={{ flex: `${proporcion(im)} 1 0` }}>
+        // Cada foto lleva su propia proporción: al repartirse el ancho en
+        // proporción a ella, todas las alturas de la fila salen iguales sin
+        // que los huecos entre fotos falseen el cálculo.
+        <div
+          key={im.id}
+          style={{
+            flex: `${proporcion(im)} 1 0`,
+            aspectRatio: String(proporcion(im)),
+          }}
+        >
           <Imagen
             im={im}
             esPrincipal={primera && i === 0}
@@ -187,11 +249,24 @@ export default function Hoja({
   const medida = (v: number | null, div: number, u: string) =>
     v === null ? '—' : `${(v / div).toLocaleString('es-ES')} ${u}`
 
-  const parrafos = (texto ?? '').split('\n\n').filter(Boolean)
   const largo = (texto ?? '').length
-  const objetivo = largo > 1200 ? 3.6 : largo > 600 ? 2.9 : 2.3
-  const filas = repartirEnFilas(imagenes, objetivo)
   const qrs = imagenes.filter((im) => im.medio === 'video' && im.qr)
+
+  // Cuánta página pueden ocupar las fotos, en anchos de página. La hoja mide
+  // 1,414 anchos de alto; lo que no se lleven las fotos es para el texto.
+  let presupuesto =
+    largo === 0 ? 1.0 : largo < 400 ? 0.78 : largo < 900 ? 0.62 : largo < 1500 ? 0.46 : 0.34
+  if (esSemana) presupuesto -= 0.1
+  if (nota) presupuesto -= 0.1
+  if (qrs.length) presupuesto -= 0.06
+  presupuesto = Math.max(presupuesto, 0.22)
+
+  const minFilas = imagenes.length >= 3 && largo > 200 ? 2 : 1
+  const { filas, objetivo } = repartoQueCabe(imagenes, presupuesto, minFilas)
+  const parrafos = trocear(
+    (texto ?? '').split('\n\n').filter(Boolean),
+    filas.length
+  )
 
   const cuerpo =
     largo > 1700
@@ -304,7 +379,6 @@ export default function Hoja({
             gap: '2.4%',
             flex: 1,
             minHeight: 0,
-            overflow: 'hidden',
           }}
         >
           {bloques.map((b) =>
