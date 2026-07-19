@@ -55,17 +55,19 @@ export default async function PaginaAlbum({
   const encabezado =
     pagina.tipo === 'semana'
       ? t.cuaderno
-      : pagina.tipo === 'viaje'
-        ? t.viaje
-        : pagina.tipo === 'ciudad'
-          ? t.mapa
-          : pagina.tipo === 'nacimiento'
-            ? t.primerDia
-            : pagina.tipo === 'embarazo'
-              ? t.antes
-              : pagina.tipo === 'cumple'
-                ? t.finAno
-                : t.album
+      : pagina.tipo === 'hito'
+        ? t.hito
+        : pagina.tipo === 'viaje'
+          ? t.viaje
+          : pagina.tipo === 'ciudad'
+            ? t.mapa
+            : pagina.tipo === 'nacimiento'
+              ? t.primerDia
+              : pagina.tipo === 'embarazo'
+                ? t.antes
+                : pagina.tipo === 'cumple'
+                  ? t.finAno
+                  : t.album
 
   const subtitulo =
     pagina.fecha_inicio && pagina.fecha_fin
