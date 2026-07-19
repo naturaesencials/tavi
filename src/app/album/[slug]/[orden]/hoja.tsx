@@ -43,6 +43,9 @@ const proporcion = (im: FotoHoja) =>
  *  partiendo por frases cuando no hay párrafos suficientes. */
 function trocear(parrafos: string[], minimo: number) {
   const trozos = [...parrafos]
+  // Sin texto no hay nada que trocear: las páginas vacías (portada, semanas
+  // sin escribir) llegaban aquí y reventaban al buscar frases que no existen.
+  if (trozos.length === 0) return trozos
   while (trozos.length < minimo) {
     let i = 0
     for (let j = 1; j < trozos.length; j++)
