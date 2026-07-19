@@ -48,6 +48,12 @@ export default async function Inicio() {
           {user?.email ?? 'sin sesión'}
         </span>
         <Link
+          href="/taller"
+          className="font-cuerpo text-[0.85rem] font-medium text-pino underline underline-offset-4 hover:text-ocre"
+        >
+          El taller
+        </Link>
+        <Link
           href="/cuenta"
           className="font-cuerpo text-[0.85rem] font-medium text-pino underline underline-offset-4 hover:text-ocre"
         >
