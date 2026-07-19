@@ -3,7 +3,26 @@ import { createClient } from '@/lib/supabase/server'
 import Subidor from './subidor'
 import Ficha, { type FichaDatos } from './ficha'
 
-type FilaFoto = Omit<FichaDatos, 'url'> & { poster_ruta: string | null }
+type FilaFoto = Omit<FichaDatos, 'url' | 'hora_local'> & {
+  poster_ruta: string | null
+}
+
+// La hora se enseña con el reloj del sitio donde se hizo la foto.
+function horaLocal(iso: string | null, zona: string) {
+  if (!iso) return null
+  try {
+    return new Intl.DateTimeFormat('es-ES', {
+      timeZone: zona,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(iso))
+  } catch {
+    return null
+  }
+}
 
 export default async function Taller({
   searchParams,
@@ -16,7 +35,7 @@ export default async function Taller({
   let consulta = supabase
     .from('fotos')
     .select(
-      'id, ruta, poster_ruta, nombre_original, medio, tomada_en, fecha_inferida_de, lugar, categoria, titulo, nota, revisada, duracion_s, ancho, alto'
+      'id, ruta, poster_ruta, nombre_original, medio, tomada_en, fecha_inferida_de, lugar, categoria, titulo, nota, revisada, duracion_s, ancho, alto, zona_horaria'
     )
     .order('tomada_en', { ascending: true, nullsFirst: false })
 
@@ -103,7 +122,8 @@ export default async function Taller({
               key={f.id}
               d={{
                 ...f,
-                url: url.get(f.medio === 'video' ? f.ruta : f.ruta) ?? null,
+                hora_local: horaLocal(f.tomada_en, f.zona_horaria),
+                url: url.get(f.ruta) ?? null,
               }}
             />
           ))}

@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import tzLookup from 'tz-lookup'
 import { createClient } from '@/lib/supabase/server'
 
 export type Entrada = {
@@ -15,6 +16,7 @@ export type Entrada = {
   alto: number | null
   duracion_s: number | null
   poster_ruta: string | null
+  zona_del_navegador: string | null
 }
 
 // Nominatim pide identificarse y no admite ráfagas: se consulta de una en una
@@ -45,9 +47,26 @@ export async function registrarSubidas(entradas: Entrada[]) {
   const filas = []
   for (const e of entradas) {
     let lugar: string | null = null
+    let zona = e.zona_del_navegador ?? 'Europe/Madrid'
     if (e.latitud !== null && e.longitud !== null) {
       lugar = await nombreDelLugar(e.latitud, e.longitud)
+      try {
+        zona = tzLookup(e.latitud, e.longitud)
+      } catch {
+        // coordenadas raras: se queda la zona del navegador
+      }
     }
+
+    // El EXIF llega sin zona (sin la Z final): se ancla a la zona del sitio.
+    // Las fechas de archivo sí son instantes reales y no se tocan.
+    const tomada =
+      e.tomada_en && !e.tomada_en.endsWith('Z')
+        ? new Date(
+            new Date(`${e.tomada_en}Z`).toLocaleString('sv-SE', {
+              timeZone: 'UTC',
+            }) + 'Z'
+          ).toISOString()
+        : e.tomada_en
 
     const sinFecha = !e.tomada_en
     const motivo = sinFecha
@@ -64,7 +83,8 @@ export async function registrarSubidas(entradas: Entrada[]) {
       ruta: e.ruta,
       nombre_original: e.nombre_original,
       medio: e.medio,
-      tomada_en: e.tomada_en,
+      tomada_en: tomada,
+      zona_horaria: zona,
       fecha_inferida_de: e.fecha_inferida_de,
       latitud: e.latitud,
       longitud: e.longitud,
@@ -93,6 +113,7 @@ export async function actualizarFicha(
     categoria?: string | null
     titulo?: string | null
     nota?: string | null
+    zona_horaria?: string
     revisada?: boolean
   }
 ) {

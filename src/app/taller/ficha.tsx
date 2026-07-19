@@ -19,6 +19,8 @@ export type FichaDatos = {
   duracion_s: number | null
   ancho: number | null
   alto: number | null
+  zona_horaria: string
+  hora_local: string | null
 }
 
 const CATEGORIAS = [
@@ -30,6 +32,12 @@ const CATEGORIAS = [
   ['tavi', 'Tavi'],
   ['familia', 'Familia'],
   ['otro', 'Otro'],
+]
+
+const ZONAS = [
+  ['Europe/Madrid', 'Marbella / España'],
+  ['America/Los_Angeles', 'Portland / San Diego'],
+  ['America/New_York', 'Nueva York'],
 ]
 
 const ORIGEN: Record<string, string> = {
@@ -49,6 +57,7 @@ export default function Ficha({ d }: { d: FichaDatos }) {
   const [categoria, setCategoria] = useState(d.categoria ?? '')
   const [titulo, setTitulo] = useState(d.titulo ?? '')
   const [nota, setNota] = useState(d.nota ?? '')
+  const [zona, setZona] = useState(d.zona_horaria)
   const [revisada, setRevisada] = useState(d.revisada)
   const [guardado, setGuardado] = useState(false)
   const [pendiente, empezar] = useTransition()
@@ -61,6 +70,7 @@ export default function Ficha({ d }: { d: FichaDatos }) {
         tomada_en: fecha ? `${fecha}T12:00:00.000Z` : null,
         lugar: lugar.trim() || null,
         categoria: categoria || null,
+        zona_horaria: zona,
         titulo: titulo.trim() || null,
         nota: nota.trim() || null,
         revisada: marcarRevisada ? true : revisada,
@@ -127,10 +137,26 @@ export default function Ficha({ d }: { d: FichaDatos }) {
       <p
         className={`mt-1 text-[0.68rem] ${fiable ? 'text-pino/45' : 'text-ocre'}`}
       >
+        {d.hora_local ? `${d.hora_local} · ` : ''}
         {d.fecha_inferida_de
           ? ORIGEN[d.fecha_inferida_de]
           : 'sin fecha de ningún sitio'}
       </p>
+
+      <label className="mt-4 block text-[0.65rem] font-bold uppercase tracking-[0.14em] text-pino-claro">
+        Reloj con el que se lee
+      </label>
+      <select
+        value={zona}
+        onChange={(e) => setZona(e.target.value)}
+        className={`${campo} cursor-pointer`}
+      >
+        {ZONAS.map(([v, n]) => (
+          <option key={v} value={v}>
+            {n}
+          </option>
+        ))}
+      </select>
 
       <label className="mt-4 block text-[0.65rem] font-bold uppercase tracking-[0.14em] text-pino-claro">
         Lugar

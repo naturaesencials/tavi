@@ -122,7 +122,14 @@ export default function Subidor() {
         try {
           const ex = await exifr.parse(f, { gps: true })
           if (ex?.DateTimeOriginal) {
-            tomada = new Date(ex.DateTimeOriginal).toISOString()
+            // El EXIF no lleva zona: son las horas del reloj del sitio donde
+            // se disparó. Se mandan tal cual y el servidor las interpreta con
+            // la zona que corresponda a las coordenadas.
+            const d = new Date(ex.DateTimeOriginal)
+            const dd = (n: number) => String(n).padStart(2, '0')
+            tomada = `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(
+              d.getDate()
+            )}T${dd(d.getHours())}:${dd(d.getMinutes())}:${dd(d.getSeconds())}`
             origen = 'exif'
           }
           if (typeof ex?.latitude === 'number') {
@@ -165,6 +172,7 @@ export default function Subidor() {
 
       if (!error) {
         entradas.push({
+          zona_del_navegador: Intl.DateTimeFormat().resolvedOptions().timeZone,
           ruta,
           nombre_original: f.name,
           medio: esVideo ? 'video' : 'foto',
