@@ -87,6 +87,7 @@ export default function Hoja({
   semana,
   fotos,
   pie,
+  esSemana,
 }: {
   idioma: Idioma
   encabezado: string
@@ -101,6 +102,7 @@ export default function Hoja({
   semana: number | null
   fotos: number
   pie: string
+  esSemana: boolean
 }) {
   const t = T[idioma]
   const medida = (v: number | null, div: number, unidad: string) =>
@@ -184,6 +186,7 @@ export default function Hoja({
         </div>
       </div>
 
+      {esSemana && (
       <section
         style={{
           marginTop: '4%',
@@ -222,12 +225,31 @@ export default function Hoja({
           </span>
         </div>
       </section>
+      )}
 
       <section style={{ marginTop: '4%', flex: 1 }}>
         {texto ? (
-          <p style={{ fontSize: '0.95rem', lineHeight: 1.65, color: '#4A3B28' }}>
-            {texto}
-          </p>
+          <div
+            style={{
+              // El cuerpo se aprieta según crece el texto: una hoja A4 no da
+              // de sí y es preferible letra algo menor a que se desborde.
+              fontSize: esSemana
+                ? '0.95rem'
+                : texto.length > 1500
+                  ? '0.8rem'
+                  : texto.length > 1100
+                    ? '0.85rem'
+                    : '0.9rem',
+              lineHeight: 1.6,
+              color: '#4A3B28',
+            }}
+          >
+            {texto.split('\n\n').map((parrafo, i) => (
+              <p key={i} style={{ marginTop: i === 0 ? 0 : '0.7em' }}>
+                {parrafo}
+              </p>
+            ))}
+          </div>
         ) : (
           <p style={{ fontSize: '0.95rem', color: APAGADO, fontStyle: 'italic' }}>
             {t.sinCuento}
@@ -238,11 +260,12 @@ export default function Hoja({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
+          gridTemplateColumns: esSemana ? '1fr 1fr' : '1fr',
           gap: '4%',
           marginTop: '3%',
         }}
       >
+        {esSemana && (
         <div style={{ border: `1px dashed ${ROJO}`, padding: '3%' }}>
           <p
             style={{
@@ -281,6 +304,7 @@ export default function Hoja({
             </p>
           )}
         </div>
+        )}
 
         <div style={{ border: `1px dashed ${VERDE}`, padding: '3%' }}>
           <p

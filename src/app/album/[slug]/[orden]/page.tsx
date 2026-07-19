@@ -120,6 +120,7 @@ export default async function PaginaAlbum({
       <Hoja
         encabezado={encabezado}
         idioma={idioma}
+        esSemana={pagina.tipo === 'semana'}
         titulo={
           elige(pagina.titulo, pagina.titulo_en, idioma) ??
           elige(album.titulo, album.titulo_en, idioma) ??
