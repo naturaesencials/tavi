@@ -8,19 +8,31 @@ const VERDE = '#2E6E5E'
 
 import { T, type Idioma } from '@/lib/idioma'
 
+export type FotoHoja = {
+  id: string
+  url: string | null
+  posterUrl: string | null
+  medio: 'foto' | 'video'
+  titulo: string | null
+  lugar: string | null
+}
+
 function Hueco({
   ancho,
   alto,
   giro,
   pie,
   vacio,
+  foto,
 }: {
   ancho: string
   alto: string
   giro: number
   pie: string
   vacio: string
+  foto?: FotoHoja
 }) {
+  const fuente = foto?.medio === 'video' ? foto.posterUrl : foto?.url
   return (
     <figure
       className="relative bg-white"
@@ -38,13 +50,46 @@ function Hueco({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          overflow: 'hidden',
+          position: 'relative',
         }}
       >
-        <span
-          style={{ color: '#8E8B7F', fontSize: '0.72rem', letterSpacing: '1px' }}
-        >
-          {vacio}
-        </span>
+        {fuente ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={fuente}
+              alt={foto?.titulo ?? ''}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            {foto?.medio === 'video' && (
+              <span
+                style={{
+                  position: 'absolute',
+                  right: 6,
+                  bottom: 6,
+                  background: TINTA,
+                  color: KRAFT,
+                  fontSize: '0.6rem',
+                  letterSpacing: '1px',
+                  padding: '2px 6px',
+                }}
+              >
+                VÍDEO
+              </span>
+            )}
+          </>
+        ) : (
+          <span
+            style={{
+              color: '#8E8B7F',
+              fontSize: '0.72rem',
+              letterSpacing: '1px',
+            }}
+          >
+            {vacio}
+          </span>
+        )}
       </div>
       <figcaption
         style={{
@@ -54,12 +99,13 @@ function Hueco({
           fontSize: '0.72rem',
         }}
       >
-        {pie}
+        {foto?.titulo ?? pie}
       </figcaption>
       <span
         aria-hidden
         style={{
           position: 'absolute',
+          display: foto ? 'block' : 'none',
           top: '-3%',
           left: '22%',
           width: '22%',
@@ -86,6 +132,7 @@ export default function Hoja({
   cabezaMm,
   semana,
   fotos,
+  imagenes,
   pie,
   esSemana,
 }: {
@@ -101,6 +148,7 @@ export default function Hoja({
   cabezaMm: number | null
   semana: number | null
   fotos: number
+  imagenes: FotoHoja[]
   pie: string
   esSemana: boolean
 }) {
@@ -153,38 +201,68 @@ export default function Hoja({
         </p>
       </header>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1.9fr 1fr',
-          gap: '4%',
-          marginTop: '4%',
-        }}
-      >
-        <Hueco
-          ancho="100%"
-          alto="14rem"
-          giro={-1.2}
-          vacio={t.hueco}
-          pie={semana ? t.manta(semana) : t.principal}
-        />
-        <div style={{ display: 'grid', gap: '10%' }}>
-          <Hueco
-            ancho="100%"
-            alto="5.4rem"
-            giro={1}
-            pie={t.segunda}
-            vacio={t.hueco}
-          />
-          <Hueco
-            ancho="100%"
-            alto="5.4rem"
-            giro={-0.8}
-            pie={t.tercera}
-            vacio={t.hueco}
-          />
+      {imagenes.length > 3 ? (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '3%',
+            marginTop: '4%',
+          }}
+        >
+          {imagenes.slice(0, 6).map((im, i) => (
+            <Hueco
+              key={im.id}
+              ancho="100%"
+              alto="7.6rem"
+              giro={i % 2 === 0 ? -1 : 1}
+              pie=""
+              vacio={t.hueco}
+              foto={im}
+            />
+          ))}
         </div>
-      </div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: imagenes.length > 1 ? '1.9fr 1fr' : '1fr',
+            gap: '4%',
+            marginTop: '4%',
+          }}
+        >
+          <Hueco
+            ancho="100%"
+            alto="14rem"
+            giro={-1.2}
+            vacio={t.hueco}
+            pie={semana ? t.manta(semana) : t.principal}
+            foto={imagenes[0]}
+          />
+          {imagenes.length > 1 && (
+            <div style={{ display: 'grid', gap: '10%' }}>
+              <Hueco
+                ancho="100%"
+                alto="5.4rem"
+                giro={1}
+                pie={t.segunda}
+                vacio={t.hueco}
+                foto={imagenes[1]}
+              />
+              {imagenes.length > 2 && (
+                <Hueco
+                  ancho="100%"
+                  alto="5.4rem"
+                  giro={-0.8}
+                  pie={t.tercera}
+                  vacio={t.hueco}
+                  foto={imagenes[2]}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {esSemana && (
       <section

@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fechaLarga, fechaLargaEn, rango, rangoEn } from '@/lib/fechas'
 import { elige, leerIdioma, T } from '@/lib/idioma'
 import type { Album, Foto, Pagina } from '@/lib/tipos'
-import Hoja from './hoja'
+import Hoja, { type FotoHoja } from './hoja'
 
 export default async function PaginaAlbum({
   params,
@@ -43,7 +43,28 @@ export default async function PaginaAlbum({
     .select('*')
     .eq('pagina_id', pagina.id)
     .order('orden')
-    .returns<Foto[]>()
+    .returns<(Foto & { medio: 'foto' | 'video'; poster_ruta: string | null; titulo_en: string | null })[]>()
+
+  // Un enlace firmado por archivo: el bucket es privado y no se sirve solo.
+  const rutas = (fotos ?? []).flatMap((f) =>
+    [f.ruta, f.poster_ruta].filter(Boolean as unknown as (x: unknown) => x is string)
+  )
+  const { data: firmadas } = rutas.length
+    ? await supabase.storage.from('fotos').createSignedUrls(rutas, 3600)
+    : { data: [] }
+  const enlace = new Map<string, string>()
+  ;(firmadas ?? []).forEach((s) => {
+    if (s.path && s.signedUrl) enlace.set(s.path, s.signedUrl)
+  })
+
+  const imagenes: FotoHoja[] = (fotos ?? []).map((f) => ({
+    id: f.id,
+    url: enlace.get(f.ruta) ?? null,
+    posterUrl: f.poster_ruta ? (enlace.get(f.poster_ruta) ?? null) : null,
+    medio: f.medio,
+    titulo: elige(f.titulo, f.titulo_en, idioma),
+    lugar: f.lugar,
+  }))
 
   const { count: total } = await supabase
     .from('paginas')
@@ -139,6 +160,7 @@ export default async function PaginaAlbum({
         cabezaMm={pagina.cabeza_mm}
         semana={pagina.numero_semana}
         fotos={(fotos ?? []).length}
+        imagenes={imagenes}
         pie={elige(album.titulo, album.titulo_en, idioma) ?? ''}
       />
 
