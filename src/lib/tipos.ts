@@ -13,6 +13,7 @@ export type Album = {
 export type TipoPagina =
   | 'portada'
   | 'embarazo'
+  | 'viaje'
   | 'ciudad'
   | 'nacimiento'
   | 'semana'

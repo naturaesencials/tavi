@@ -9,6 +9,7 @@ const ROTULO = {
   es: {
     portada: 'Portada',
     embarazo: 'Antes',
+    viaje: 'El viaje',
     ciudad: 'Tu ciudad',
     nacimiento: 'Naciste',
     cumple: 'Cumpleaños',
@@ -16,6 +17,7 @@ const ROTULO = {
   en: {
     portada: 'Cover',
     embarazo: 'Before',
+    viaje: 'The journey',
     ciudad: 'Your city',
     nacimiento: 'Born',
     cumple: 'Birthday',
