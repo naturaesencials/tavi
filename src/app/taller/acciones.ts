@@ -126,6 +126,18 @@ export async function actualizarFicha(
   }
   if (cambios.revisada) datos.necesita_revision = false
 
+  // Si la ficha ya está completa, se da por revisada sola: pedir además un
+  // segundo botón era una trampa para el que la rellena.
+  const completa =
+    !!cambios.categoria &&
+    !!cambios.lugar &&
+    !!cambios.nota &&
+    cambios.tomada_en !== null
+  if (completa) {
+    datos.revisada = true
+    datos.necesita_revision = false
+  }
+
   const { error } = await supabase.from('fotos').update(datos).eq('id', id)
   if (error) return { error: error.message }
 
