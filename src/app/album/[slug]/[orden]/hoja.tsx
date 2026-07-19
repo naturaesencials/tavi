@@ -1,5 +1,6 @@
 import { T, type Idioma } from '@/lib/idioma'
-import type { TipoPagina } from '@/lib/tipos'
+import Fondo from './fondo'
+import Marco, { elegirMarco } from './marco'
 
 export type FotoHoja = {
   id: string
@@ -10,42 +11,34 @@ export type FotoHoja = {
   lugar: string | null
   ancho: number | null
   alto: number | null
+  categoria: string | null
   qr: string | null
   duracion: number | null
 }
 
-const PAPEL = '#FDF7E9'
-const TINTA = '#2E3A34'
-const SUAVE = '#6E7B71'
+const PAPEL = '#FCF8F0'
+const TINTA = '#28322C'
+const SUAVE = '#7A8A80'
+const RAYA = '#D8DCD4'
 
-// Cada tramo del álbum tiene su color: se ve una página y se sabe en qué
-// parte de la historia estás sin leer una palabra.
+// El color ya no tiñe la página: solo marca el tramo en un filete y en el
+// rótulo. Se reconoce la sección sin que la hoja se vuelva un cromo.
 const ACENTO: Record<string, string> = {
-  portada: '#E8663A',
-  nombre: '#F0B429',
-  embarazo: '#D9536F',
-  origen: '#2E9E9E',
-  hito: '#E8663A',
-  viaje: '#4AA3D9',
-  ciudad: '#62A85A',
-  nacimiento: '#D9536F',
-  semana: '#F0B429',
-  cumple: '#E8663A',
-}
-
-function aclarar(hex: string, mezcla: number) {
-  const n = parseInt(hex.slice(1), 16)
-  const r = (n >> 16) & 255
-  const g = (n >> 8) & 255
-  const b = n & 255
-  const m = (c: number) => Math.round(c + (253 - c) * mezcla)
-  return `rgb(${m(r)}, ${m(g)}, ${m(b)})`
+  portada: '#C4623C',
+  nombre: '#B98A20',
+  embarazo: '#B85572',
+  origen: '#2E8B8B',
+  hito: '#C4623C',
+  viaje: '#3E86B8',
+  ciudad: '#578F52',
+  nacimiento: '#B85572',
+  semana: '#B98A20',
+  cumple: '#C4623C',
 }
 
 const proporcion = (im: FotoHoja) =>
   im.ancho && im.alto ? im.ancho / im.alto : 1.4
 
-/** Reparte las fotos en filas que llenan el ancho sin recortar ninguna. */
 function repartirEnFilas(imagenes: FotoHoja[], objetivo: number) {
   const filas: FotoHoja[][] = []
   let actual: FotoHoja[] = []
@@ -66,91 +59,34 @@ function repartirEnFilas(imagenes: FotoHoja[], objetivo: number) {
   }))
 }
 
-function Cinta({ color }: { color: string }) {
-  return (
-    <span
-      aria-hidden
-      style={{
-        position: 'absolute',
-        top: '-9px',
-        left: '28%',
-        width: '52px',
-        height: '18px',
-        background: color,
-        opacity: 0.45,
-        borderRadius: '2px',
-        transform: 'rotate(-4deg)',
-        zIndex: 2,
-      }}
-    />
-  )
-}
-
-function Codigo({ svg, acento }: { svg: string; acento: string }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        background: '#FFFFFF',
-        border: `2px solid ${acento}`,
-        borderRadius: '12px',
-        padding: '6px 10px',
-      }}
-    >
-      <span
-        style={{ width: '44px', height: '44px', display: 'block' }}
-        dangerouslySetInnerHTML={{ __html: svg }}
-      />
-      <span
-        style={{
-          fontSize: '0.6rem',
-          lineHeight: 1.25,
-          color: acento,
-          fontWeight: 700,
-          maxWidth: '80px',
-        }}
-      >
-        Apunta aquí y verás el vídeo
-      </span>
-    </div>
-  )
-}
-
-function Foto({
+function Imagen({
   im,
-  acento,
+  esPrincipal,
+  indice,
+  clavePagina,
   vacio,
-  conCinta,
 }: {
-  im?: FotoHoja
-  acento: string
+  im: FotoHoja
+  esPrincipal: boolean
+  indice: number
+  clavePagina: string
   vacio: string
-  conCinta?: boolean
 }) {
-  const fuente = im?.medio === 'video' ? im.posterUrl : im?.url
+  const fuente = im.medio === 'video' ? im.posterUrl : im.url
+  const estilo = elegirMarco(
+    im.id,
+    im.categoria,
+    esPrincipal,
+    indice,
+    clavePagina
+  )
   return (
-    <figure
-      style={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        margin: 0,
-        background: '#FFFFFF',
-        borderRadius: '12px',
-        padding: '5px',
-        boxShadow: '0 3px 10px rgba(90, 72, 45, 0.16)',
-      }}
-    >
-      {conCinta && <Cinta color={acento} />}
+    <Marco id={im.id} estilo={estilo}>
       <div
         style={{
           width: '100%',
           height: '100%',
-          borderRadius: '8px',
-          overflow: 'hidden',
-          background: aclarar(acento, 0.86),
+          background: '#E6E9E2',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -160,50 +96,54 @@ function Foto({
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={fuente}
-            alt={im?.titulo ?? ''}
+            alt={im.titulo ?? ''}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (
-          <span style={{ color: SUAVE, fontSize: '0.7rem' }}>{vacio}</span>
+          <span style={{ color: SUAVE, fontSize: '0.68rem' }}>{vacio}</span>
         )}
       </div>
-      {im?.medio === 'video' && (
-        <span
-          style={{
-            position: 'absolute',
-            right: '9px',
-            bottom: '9px',
-            background: acento,
-            color: '#FFF',
-            fontSize: '0.55rem',
-            fontWeight: 700,
-            padding: '3px 8px',
-            borderRadius: '99px',
-          }}
-        >
-          ▶ VÍDEO
-        </span>
-      )}
-    </figure>
+    </Marco>
   )
 }
 
-function Garabato({ acento }: { acento: string }) {
+function FilaFotos({
+  fila,
+  objetivo,
+  primera,
+  desde,
+  clavePagina,
+  vacio,
+}: {
+  fila: { fotos: FotoHoja[]; suma: number }
+  objetivo: number
+  primera: boolean
+  desde: number
+  clavePagina: string
+  vacio: string
+}) {
   return (
-    <svg aria-hidden viewBox="0 0 120 26" style={{ width: '110px' }}>
-      <path
-        d="M2 20C20 4 40 26 58 12S96 2 118 16"
-        fill="none"
-        stroke={acento}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeDasharray="1 8"
-      />
-      <path
-        d="M104 0l2.2 4.8L111 7l-4.8 2.2L104 14l-2.2-4.8L97 7l4.8-2.2z"
-        fill={acento}
-      />
-    </svg>
+    <div
+      style={{
+        display: 'flex',
+        gap: '11px',
+        aspectRatio: String(fila.suma),
+        width: `${Math.min(1, fila.suma / objetivo) * 100}%`,
+        minHeight: 0,
+      }}
+    >
+      {fila.fotos.map((im, i) => (
+        <div key={im.id} style={{ flex: `${proporcion(im)} 1 0` }}>
+          <Imagen
+            im={im}
+            esPrincipal={primera && i === 0}
+            indice={desde + i}
+            clavePagina={clavePagina}
+            vacio={vacio}
+          />
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -213,6 +153,7 @@ export default function Hoja({
   encabezado,
   titulo,
   subtitulo,
+  lugarPie,
   texto,
   notaTitulo,
   nota,
@@ -225,10 +166,11 @@ export default function Hoja({
   esSemana,
 }: {
   idioma: Idioma
-  tipo: TipoPagina
+  tipo: string
   encabezado: string
   titulo: string
   subtitulo: string
+  lugarPie: string
   texto: string | null
   notaTitulo: string | null
   nota: string | null
@@ -241,44 +183,37 @@ export default function Hoja({
   esSemana: boolean
 }) {
   const t = T[idioma]
-  const acento = ACENTO[tipo] ?? '#E8663A'
+  const acento = ACENTO[tipo] ?? '#C4623C'
   const medida = (v: number | null, div: number, u: string) =>
     v === null ? '—' : `${(v / div).toLocaleString('es-ES')} ${u}`
 
+  const parrafos = (texto ?? '').split('\n\n').filter(Boolean)
   const largo = (texto ?? '').length
-  // Con mucho texto las fotos se agrupan en filas más apaisadas para dejarle
-  // sitio; con poco, se les da aire.
-  const objetivo = largo > 1200 ? 3.6 : largo > 600 ? 2.9 : 2.2
-  const unica = imagenes.length === 1 ? imagenes[0] : undefined
-  const filas = unica ? [] : repartirEnFilas(imagenes, objetivo)
+  const objetivo = largo > 1200 ? 3.6 : largo > 600 ? 2.9 : 2.3
+  const filas = repartirEnFilas(imagenes, objetivo)
   const qrs = imagenes.filter((im) => im.medio === 'video' && im.qr)
 
   const cuerpo =
-    largo > 1500
-      ? '0.78rem'
-      : largo > 1100
-        ? '0.85rem'
-        : largo > 600
-          ? '0.92rem'
-          : '1rem'
+    largo > 1700
+      ? '0.72rem'
+      : largo > 1300
+        ? '0.77rem'
+        : largo > 900
+          ? '0.82rem'
+          : largo > 500
+            ? '0.86rem'
+            : '0.95rem'
 
-  const vertical = unica ? proporcion(unica) < 1 : false
+  // El texto se cuela entre las filas de fotos: una foto, un trozo de
+  // historia, otra foto. Lo que sobra baja al final a dos columnas.
+  const bloques: { clase: 'fotos' | 'texto'; i: number }[] = []
+  const total = Math.max(filas.length, parrafos.length)
+  for (let i = 0; i < total; i++) {
+    if (i < filas.length) bloques.push({ clase: 'fotos', i })
+    if (i < parrafos.length) bloques.push({ clase: 'texto', i })
+  }
 
-  // Una hoja A4 no se estira. Según lo que tenga que convivir con las fotos
-  // (medidas, texto largo, recuadros, códigos), el bloque de imágenes recibe
-  // más o menos altura, y dentro de ese techo se reparten sin recortarse.
-  const extras =
-    (esSemana ? 1 : 0) + (nota ? 1 : 0) + (qrs.length ? 1 : 0)
-  const techo =
-    extras >= 2
-      ? '30%'
-      : extras === 1
-        ? '38%'
-        : largo > 1200
-          ? '34%'
-          : largo > 600
-            ? '46%'
-            : '58%'
+  const columnas = largo > 900 ? 3 : largo > 380 ? 2 : 1
 
   return (
     <article
@@ -291,279 +226,247 @@ export default function Hoja({
         aspectRatio: '210 / 297',
         background: PAPEL,
         color: TINTA,
-        padding: '4.5% 5.5% 3.5%',
+        padding: '4.4% 5% 3.2%',
         display: 'flex',
         flexDirection: 'column',
-        borderRadius: '5px',
-        boxShadow: '0 2px 18px rgba(90,72,45,0.14)',
         overflow: 'hidden',
+        boxShadow: '0 2px 16px rgba(90,80,60,0.13)',
       }}
     >
-      <span
-        aria-hidden
+      <Fondo clave={titulo} tipo={tipo} texto={texto} />
+
+      <div
         style={{
-          position: 'absolute',
-          insetInline: 0,
-          top: 0,
-          height: '9px',
-          background: acento,
-        }}
-      />
-
-      <header style={{ paddingTop: '0.8%' }}>
-        <p
-          style={{
-            color: acento,
-            fontSize: '0.66rem',
-            fontWeight: 700,
-            letterSpacing: '2.5px',
-            textTransform: 'uppercase',
-          }}
-        >
-          {encabezado}
-        </p>
-        <h1
-          style={{
-            fontSize: 'clamp(1.5rem,4.2vw,2.5rem)',
-            lineHeight: 1.05,
-            marginTop: '1.2%',
-          }}
-        >
-          {titulo}
-        </h1>
-        {subtitulo && (
-          <p style={{ color: SUAVE, fontSize: '0.84rem', marginTop: '1%' }}>
-            {subtitulo}
-          </p>
-        )}
-      </header>
-
-      {imagenes.length > 0 && (
-        <div
-          style={{
-            marginTop: '3.4%',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            maxHeight: techo,
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
-          {unica ? (
-            <div
-              style={{
-                aspectRatio: String(proporcion(unica)),
-                alignSelf: 'center',
-                minHeight: 0,
-                maxWidth: '100%',
-                width: vertical ? (largo > 900 ? '40%' : '52%') : '100%',
-              }}
-            >
-              <Foto im={unica} acento={acento} vacio={t.hueco} conCinta />
-            </div>
-          ) : (
-            filas.map((fila, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  gap: '10px',
-                  aspectRatio: String(fila.suma),
-                  minHeight: 0,
-                  // La última fila no se estira a todo el ancho: se queda con
-                  // la anchura que le toca para que todas las filas tengan la
-                  // misma altura y ninguna foto engorde de más.
-                  width: `${Math.min(1, fila.suma / objetivo) * 100}%`,
-                }}
-              >
-                {fila.fotos.map((im) => (
-                  <div
-                    key={im.id}
-                    style={{ flex: `${proporcion(im)} 1 0`, position: 'relative' }}
-                  >
-                    <Foto
-                      im={im}
-                      acento={acento}
-                      vacio={t.hueco}
-                      conCinta={i === 0}
-                    />
-                  </div>
-                ))}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {esSemana && (
-        <section
-          style={{
-            marginTop: '3.4%',
-            background: aclarar(acento, 0.84),
-            borderRadius: '14px',
-            padding: '2.4% 3.4%',
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '6%',
-            alignItems: 'baseline',
-            fontSize: '0.95rem',
-          }}
-        >
-          <span
-            style={{
-              color: acento,
-              fontSize: '0.62rem',
-              fontWeight: 700,
-              letterSpacing: '2px',
-              textTransform: 'uppercase',
-              width: '100%',
-            }}
-          >
-            {t.parte}
-          </span>
-          <span>
-            {t.peso} {medida(pesoG, 1000, 'kg')}
-          </span>
-          <span>
-            {t.talla} {medida(tallaMm, 10, 'cm')}
-          </span>
-          <span>
-            {t.cabeza} {medida(cabezaMm, 10, 'cm')}
-          </span>
-        </section>
-      )}
-
-      <section style={{ marginTop: '3.4%', flex: 1, minHeight: 0 }}>
-        {texto ? (
-          <div style={{ fontSize: cuerpo, lineHeight: 1.58 }}>
-            {texto.split('\n\n').map((parrafo, i) => (
-              <p key={i} style={{ marginTop: i === 0 ? 0 : '0.65em' }}>
-                {parrafo}
-              </p>
-            ))}
-          </div>
-        ) : (
-          <p style={{ fontSize: '0.9rem', color: SUAVE, fontStyle: 'italic' }}>
-            {t.sinCuento}
-          </p>
-        )}
-      </section>
-
-      {qrs.length > 0 && (
-        <div
-          style={{
-            marginTop: '2%',
-            display: 'flex',
-            gap: '10px',
-            flexWrap: 'wrap',
-          }}
-        >
-          {qrs.map((im) => (
-            <Codigo key={im.id} svg={im.qr!} acento={acento} />
-          ))}
-        </div>
-      )}
-
-      {(esSemana || nota) && (
-        <div
-          style={{
-            marginTop: '2.4%',
-            display: 'grid',
-            gridTemplateColumns: nota && esSemana ? '1fr 1fr' : '1fr',
-            gap: '3%',
-          }}
-        >
-          {nota && (
-            <div
-              style={{
-                background: aclarar('#4AA3D9', 0.87),
-                borderRadius: '14px',
-                padding: '3%',
-              }}
-            >
-              <p
-                style={{
-                  color: '#2E7FB0',
-                  fontSize: '0.6rem',
-                  fontWeight: 700,
-                  letterSpacing: '1.8px',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {t.mundo}
-              </p>
-              <p style={{ marginTop: '3%', fontSize: '0.84rem' }}>
-                {notaTitulo}
-              </p>
-              <p
-                style={{ marginTop: '2%', fontSize: '0.76rem', lineHeight: 1.5 }}
-              >
-                {nota}
-              </p>
-            </div>
-          )}
-          {esSemana && (
-            <div
-              style={{
-                background: aclarar('#62A85A', 0.88),
-                borderRadius: '14px',
-                padding: '3%',
-              }}
-            >
-              <p
-                style={{
-                  color: '#48853F',
-                  fontSize: '0.6rem',
-                  fontWeight: 700,
-                  letterSpacing: '1.8px',
-                  textTransform: 'uppercase',
-                }}
-              >
-                {t.familia}
-              </p>
-              <p
-                style={{
-                  marginTop: '3%',
-                  fontSize: '0.78rem',
-                  color: SUAVE,
-                  fontStyle: 'italic',
-                }}
-              >
-                {t.sinFamilia}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      <footer
-        style={{
-          marginTop: 'auto',
-          paddingTop: '2.4%',
+          position: 'relative',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '8px',
-          color: SUAVE,
-          fontSize: '0.68rem',
+          flexDirection: 'column',
+          height: '100%',
+          minHeight: 0,
         }}
       >
-        <span>{pie}</span>
-        <Garabato acento={acento} />
-        <span
+        <header style={{ flexShrink: 0 }}>
+          <p
+            style={{
+              fontSize: '0.6rem',
+              letterSpacing: '3.2px',
+              color: SUAVE,
+              textTransform: 'uppercase',
+            }}
+          >
+            {encabezado}
+          </p>
+          <div
+            style={{
+              height: '1.6px',
+              background: acento,
+              marginTop: '0.7%',
+            }}
+          />
+          <h1
+            style={{
+              fontSize: 'clamp(1.4rem,4vw,2.35rem)',
+              lineHeight: 1.06,
+              marginTop: '1.6%',
+              fontWeight: 400,
+            }}
+          >
+            {titulo}
+          </h1>
+          <div
+            style={{
+              height: '1px',
+              background: RAYA,
+              marginTop: '1.4%',
+            }}
+          />
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: '10px',
+              marginTop: '1%',
+              fontSize: '0.6rem',
+              letterSpacing: '1.4px',
+              color: SUAVE,
+              textTransform: 'uppercase',
+            }}
+          >
+            <span>{subtitulo}</span>
+            <span>{lugarPie}</span>
+          </div>
+        </header>
+
+        <div
           style={{
-            background: acento,
-            color: '#FFF',
-            fontWeight: 700,
-            borderRadius: '99px',
-            padding: '3px 12px',
-            whiteSpace: 'nowrap',
+            marginTop: '3%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2.4%',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
           }}
         >
-          {semana ? `${semana} / 52` : t.fotos(imagenes.length)}
-        </span>
-      </footer>
+          {bloques.map((b) =>
+            b.clase === 'fotos' ? (
+              <FilaFotos
+                key={`f${b.i}`}
+                fila={filas[b.i]}
+                objetivo={objetivo}
+                primera={b.i === 0}
+                desde={filas
+                  .slice(0, b.i)
+                  .reduce((n, f) => n + f.fotos.length, 0)}
+                clavePagina={titulo}
+                vacio={t.hueco}
+              />
+            ) : (
+              <p
+                key={`t${b.i}`}
+                style={{
+                  fontSize: cuerpo,
+                  lineHeight: 1.55,
+                  columnCount: parrafos[b.i].length > 260 ? columnas : 1,
+                  columnGap: '18px',
+                  margin: 0,
+                }}
+              >
+                {parrafos[b.i]}
+              </p>
+            )
+          )}
+
+          {parrafos.length === 0 && imagenes.length === 0 && (
+            <p style={{ fontSize: '0.88rem', color: SUAVE, fontStyle: 'italic' }}>
+              {t.sinCuento}
+            </p>
+          )}
+        </div>
+
+        {esSemana && (
+          <section
+            style={{
+              flexShrink: 0,
+              marginTop: '2%',
+              borderTop: `1px solid ${RAYA}`,
+              borderBottom: `1px solid ${RAYA}`,
+              padding: '1.6% 0',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '7%',
+              fontSize: '0.8rem',
+            }}
+          >
+            <span
+              style={{
+                width: '100%',
+                fontSize: '0.58rem',
+                letterSpacing: '2px',
+                color: acento,
+                textTransform: 'uppercase',
+              }}
+            >
+              {t.parte}
+            </span>
+            <span>
+              {t.peso} {medida(pesoG, 1000, 'kg')}
+            </span>
+            <span>
+              {t.talla} {medida(tallaMm, 10, 'cm')}
+            </span>
+            <span>
+              {t.cabeza} {medida(cabezaMm, 10, 'cm')}
+            </span>
+          </section>
+        )}
+
+        {nota && (
+          <section
+            style={{
+              flexShrink: 0,
+              marginTop: '2%',
+              borderLeft: `2px solid ${acento}`,
+              paddingLeft: '2.2%',
+            }}
+          >
+            <p
+              style={{
+                fontSize: '0.56rem',
+                letterSpacing: '1.8px',
+                color: acento,
+                textTransform: 'uppercase',
+              }}
+            >
+              {t.mundo}
+            </p>
+            <p style={{ fontSize: '0.78rem', marginTop: '0.6%' }}>{notaTitulo}</p>
+            <p
+              style={{
+                fontSize: '0.71rem',
+                lineHeight: 1.5,
+                marginTop: '0.5%',
+                columnCount: 2,
+                columnGap: '16px',
+              }}
+            >
+              {nota}
+            </p>
+          </section>
+        )}
+
+        <footer
+          style={{
+            flexShrink: 0,
+            marginTop: 'auto',
+            paddingTop: '2%',
+            borderTop: `1px solid ${RAYA}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            fontSize: '0.62rem',
+            color: SUAVE,
+          }}
+        >
+          {qrs.length > 0 ? (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {qrs.slice(0, 2).map((im) => (
+                <div
+                  key={im.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '7px',
+                    border: `1.3px solid ${acento}`,
+                    borderRadius: '3px',
+                    padding: '4px 7px',
+                  }}
+                >
+                  <span
+                    style={{ width: '30px', height: '30px', display: 'block' }}
+                    dangerouslySetInnerHTML={{ __html: im.qr! }}
+                  />
+                  <span
+                    style={{
+                      fontSize: '0.54rem',
+                      lineHeight: 1.2,
+                      color: acento,
+                      maxWidth: '72px',
+                    }}
+                  >
+                    Apunta aquí y verás el vídeo
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span>{pie}</span>
+          )}
+          <span>
+            {semana ? `${t.semanas} · ${semana}/52` : t.fotos(imagenes.length)}
+          </span>
+        </footer>
+      </div>
     </article>
   )
 }

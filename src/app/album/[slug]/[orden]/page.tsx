@@ -81,6 +81,7 @@ export default async function PaginaAlbum({
         medio: f.medio,
         titulo: elige(f.titulo, f.titulo_en, idioma),
         lugar: f.lugar,
+        categoria: (f as unknown as { categoria: string | null }).categoria,
         ancho: (f as unknown as { ancho: number | null }).ancho,
         alto: (f as unknown as { alto: number | null }).alto,
         duracion: (f as unknown as { duracion_s: number | null }).duracion_s,
@@ -174,6 +175,11 @@ export default async function PaginaAlbum({
           ''
         }
         subtitulo={subtitulo}
+        lugarPie={
+          pagina.tipo === 'semana' && pagina.numero_semana
+            ? `${t.semanas} ${pagina.numero_semana}`
+            : (album.subtitulo ?? '')
+        }
         texto={elige(pagina.texto_cuento, pagina.texto_cuento_en, idioma)}
         notaTitulo={elige(
           pagina.nota_mundo_titulo,
