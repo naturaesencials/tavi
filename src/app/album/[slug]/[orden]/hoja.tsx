@@ -71,22 +71,37 @@ type Banda =
 function componer(
   imagenes: FotoHoja[],
   trozos: string[],
-  parejas: number
+  parejas: number,
+  apilar: boolean
 ): Banda[] {
   const bandas: Banda[] = []
   const n = Math.min(parejas, imagenes.length, trozos.length)
 
+  // Las fotos que sobran se reparten en la columna de cada pareja, apiladas
+  // bajo la primera. Así pertenecen a la rejilla en vez de quedarse sueltas.
+  const porColumna: FotoHoja[][] = []
+  let usadas = n
+  for (let i = 0; i < n; i++) porColumna.push([imagenes[i]])
+  if (apilar) {
+    for (let i = 0; i < n && usadas < imagenes.length; i++) {
+      porColumna[i].push(imagenes[usadas])
+      usadas++
+    }
+  }
+
   for (let i = 0; i < n; i++)
     bandas.push({
       clase: 'pareja',
-      fotos: [imagenes[i]],
+      fotos: porColumna[i],
       texto: trozos[i],
       ladoFoto: i % 2 === 0 ? 'izq' : 'der',
     })
 
-  const resto = imagenes.slice(n)
+  const resto = imagenes.slice(usadas)
   if (resto.length) {
-    const porTira = resto.length > 4 ? Math.ceil(resto.length / 2) : resto.length
+    // Una sola tira siempre que sea posible: dos tiras ocupan mucho más alto
+    // que una, y era lo que echaba abajo las composiciones con pareja.
+    const porTira = resto.length > 6 ? Math.ceil(resto.length / 2) : resto.length
     for (let i = 0; i < resto.length; i += porTira)
       bandas.push({ clase: 'fotos', fotos: resto.slice(i, i + porTira) })
   }
@@ -122,7 +137,9 @@ function altura(
       const anchoTexto = 1 - anchoFoto - 0.045
       const porLinea = anchoTexto / (fuente * 0.47)
       const hTexto = Math.ceil(b.texto.length / porLinea) * linea
-      const hFoto = anchoFoto / proporcion(b.fotos[0])
+      const hFoto =
+        b.fotos.reduce((t, im) => t + anchoFoto / proporcion(im), 0) +
+        (b.fotos.length - 1) * 0.02
       total += Math.max(hTexto, hFoto)
     }
   }
@@ -237,26 +254,29 @@ export default function Hoja({
   const HUECO = 0.035
   const maxParejas = Math.min(3, imagenes.length)
 
-  let bandas = componer(imagenes, parrafos, 0)
+  let bandas = componer(imagenes, parrafos, 0, false)
   let fuenteRel = FUENTES[FUENTES.length - 1]
   let anchoFoto = 0.42
   let mejor = -1
 
   for (let par = maxParejas; par >= 0; par--) {
     const trozos = trocear(parrafos, Math.max(par, 1))
-    const cand = componer(imagenes, trozos, par)
-    for (const an of ANCHOS) {
-      for (const fu of FUENTES) {
-        const h = altura(cand, fu, an, HUECO)
-        if (h > disponible) continue
-        // Se premia llenar la hoja y, a igualdad, tener más parejas de foto
-        // y texto, que es la estructura que se busca.
-        const nota = h + par * 0.06
-        if (nota > mejor) {
-          mejor = nota
-          bandas = cand
-          anchoFoto = an
-          fuenteRel = fu
+    for (const apilar of [true, false]) {
+      const cand = componer(imagenes, trozos, par, apilar)
+      const sueltas = cand.filter((b) => b.clase === 'fotos').length
+      for (const an of ANCHOS) {
+        for (const fu of FUENTES) {
+          const h = altura(cand, fu, an, HUECO)
+          if (h > disponible) continue
+          // Se premia llenar la hoja, tener más parejas y dejar el menor
+          // número de tiras sueltas colgando del diseño.
+          const nota = h + par * 0.06 - sueltas * 0.05
+          if (nota > mejor) {
+            mejor = nota
+            bandas = cand
+            anchoFoto = an
+            fuenteRel = fu
+          }
         }
       }
     }
@@ -392,6 +412,8 @@ export default function Hoja({
                     alignItems: 'flex-start',
                     width: `${anchoTira(b.fotos.reduce((t, im) => t + proporcion(im), 0)) * 100}%`,
                     alignSelf: i % 2 === 1 ? 'flex-end' : 'flex-start',
+                    borderTop: `1px solid ${RAYA}`,
+                    paddingTop: '1.6%',
                   }}
                 >
                   {b.fotos.map((im, j) => (
