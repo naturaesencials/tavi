@@ -1,0 +1,11 @@
+-- Estructura de álbumes, páginas, fotos y comentarios. Ver el proyecto
+-- adjxhhzmqoudpsiqctxf para el estado aplicado. Resumen:
+--   albumes    -> un álbum por etapa (primer año, viajes, cumpleaños...)
+--   paginas    -> portada, embarazo, ciudad, nacimiento, 52 semanas, cumple
+--   fotos      -> ruta en el bucket privado 'fotos', con fecha, lugar y
+--                 marca necesita_revision cuando no se puede leer el EXIF
+--   comentarios-> por página, firmados por quien los escribe
+-- RLS: lectura para cualquier autenticado; escritura solo para el propietario,
+-- salvo comentarios, que cada uno escribe y borra los suyos.
+-- El SQL completo se aplicó con las migraciones estructura_de_albumes,
+-- semilla_album_primer_ano y semilla_notas_del_mundo_y_ciudad.
