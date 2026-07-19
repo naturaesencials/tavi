@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { fechaLarga, fechaLargaEn, rango, rangoEn } from '@/lib/fechas'
 import { elige, leerIdioma, T } from '@/lib/idioma'
 import type { Album, Foto, Pagina } from '@/lib/tipos'
+import QRCode from 'qrcode'
 import Hoja, { type FotoHoja } from './hoja'
 
 export default async function PaginaAlbum({
@@ -57,16 +58,36 @@ export default async function PaginaAlbum({
     if (s.path && s.signedUrl) enlace.set(s.path, s.signedUrl)
   })
 
-  const imagenes: FotoHoja[] = (fotos ?? []).map((f) => ({
-    id: f.id,
-    url: enlace.get(f.ruta) ?? null,
-    posterUrl: f.poster_ruta ? (enlace.get(f.poster_ruta) ?? null) : null,
-    medio: f.medio,
-    titulo: elige(f.titulo, f.titulo_en, idioma),
-    lugar: f.lugar,
-    ancho: (f as unknown as { ancho: number | null }).ancho,
-    alto: (f as unknown as { alto: number | null }).alto,
-  }))
+  const base =
+    process.env.NEXT_PUBLIC_URL_PUBLICA ?? 'https://tavi-phi.vercel.app'
+
+  const imagenes: FotoHoja[] = await Promise.all(
+    (fotos ?? []).map(async (f) => {
+      const ficha = (f as unknown as { ficha_publica: string | null })
+        .ficha_publica
+      const qr =
+        f.medio === 'video' && ficha
+          ? await QRCode.toString(`${base}/v/${ficha}`, {
+              type: 'svg',
+              margin: 0,
+              errorCorrectionLevel: 'M',
+              color: { dark: '#2E3A34', light: '#0000' },
+            })
+          : null
+      return {
+        id: f.id,
+        url: enlace.get(f.ruta) ?? null,
+        posterUrl: f.poster_ruta ? (enlace.get(f.poster_ruta) ?? null) : null,
+        medio: f.medio,
+        titulo: elige(f.titulo, f.titulo_en, idioma),
+        lugar: f.lugar,
+        ancho: (f as unknown as { ancho: number | null }).ancho,
+        alto: (f as unknown as { alto: number | null }).alto,
+        duracion: (f as unknown as { duracion_s: number | null }).duracion_s,
+        qr,
+      }
+    })
+  )
 
   const { count: total } = await supabase
     .from('paginas')
@@ -145,6 +166,7 @@ export default async function PaginaAlbum({
       <Hoja
         encabezado={encabezado}
         idioma={idioma}
+        tipo={pagina.tipo}
         esSemana={pagina.tipo === 'semana'}
         titulo={
           elige(pagina.titulo, pagina.titulo_en, idioma) ??
@@ -163,7 +185,6 @@ export default async function PaginaAlbum({
         tallaMm={pagina.talla_mm}
         cabezaMm={pagina.cabeza_mm}
         semana={pagina.numero_semana}
-        fotos={(fotos ?? []).length}
         imagenes={imagenes}
         pie={elige(album.titulo, album.titulo_en, idioma) ?? ''}
       />

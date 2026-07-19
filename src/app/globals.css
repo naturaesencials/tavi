@@ -3,13 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --pino: #14312a;
-  --pino-claro: #2c5347;
-  --hueso: #eff1ea;
-  --hueso-hondo: #e3e6db;
-  --ocre: #c9a227;
-  --rosa: #d9b8b1;
-  --tinta: #101915;
+  --pino: #24473c;
+  --pino-claro: #3a6b58;
+  --hueso: #fdf7e9;
+  --hueso-hondo: #f4ead2;
+  --ocre: #e39a1f;
+  --rosa: #d9536f;
+  --tinta: #2e3a34;
+
+  /* Paleta del álbum: la hoja es para un niño, no para un informe. */
+  --mandarina: #e8663a;
+  --turquesa: #2e9e9e;
+  --mostaza: #f0b429;
+  --frambuesa: #d9536f;
+  --hoja: #62a85a;
+  --cielo: #4aa3d9;
+  --papel: #fdf7e9;
+  --papel-hondo: #f6ecd6;
 }
 
 html {

@@ -12,6 +12,12 @@ const config: Config = {
         ocre: 'var(--ocre)',
         rosa: 'var(--rosa)',
         tinta: 'var(--tinta)',
+        mandarina: 'var(--mandarina)',
+        turquesa: 'var(--turquesa)',
+        mostaza: 'var(--mostaza)',
+        frambuesa: 'var(--frambuesa)',
+        hoja: 'var(--hoja)',
+        cielo: 'var(--cielo)',
       },
       fontFamily: {
         display: ['var(--fuente-display)', 'Georgia', 'serif'],
