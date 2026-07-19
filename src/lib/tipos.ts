@@ -14,6 +14,7 @@ export type TipoPagina =
   | 'portada'
   | 'nombre'
   | 'embarazo'
+  | 'origen'
   | 'hito'
   | 'viaje'
   | 'ciudad'
