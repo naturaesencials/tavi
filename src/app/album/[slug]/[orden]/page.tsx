@@ -64,6 +64,8 @@ export default async function PaginaAlbum({
     medio: f.medio,
     titulo: elige(f.titulo, f.titulo_en, idioma),
     lugar: f.lugar,
+    ancho: (f as unknown as { ancho: number | null }).ancho,
+    alto: (f as unknown as { alto: number | null }).alto,
   }))
 
   const { count: total } = await supabase

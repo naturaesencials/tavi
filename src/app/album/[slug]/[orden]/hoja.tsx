@@ -15,11 +15,14 @@ export type FotoHoja = {
   medio: 'foto' | 'video'
   titulo: string | null
   lugar: string | null
+  ancho: number | null
+  alto: number | null
 }
 
 function Hueco({
   ancho,
   alto,
+  proporcion,
   giro,
   pie,
   vacio,
@@ -27,6 +30,7 @@ function Hueco({
 }: {
   ancho: string
   alto: string
+  proporcion?: number
   giro: number
   pie: string
   vacio: string
@@ -45,7 +49,10 @@ function Hueco({
     >
       <div
         style={{
-          height: alto,
+          // Con una sola imagen se respeta su proporción real: recortarla
+          // a un marco apaisado se comía media foto.
+          height: proporcion ? undefined : alto,
+          aspectRatio: proporcion ? String(proporcion) : undefined,
           background: '#D6D2C4',
           display: 'flex',
           alignItems: 'center',
@@ -234,6 +241,13 @@ export default function Hoja({
           <Hueco
             ancho="100%"
             alto="14rem"
+            proporcion={
+              imagenes.length === 1 &&
+              imagenes[0]?.ancho &&
+              imagenes[0]?.alto
+                ? imagenes[0].ancho / imagenes[0].alto
+                : undefined
+            }
             giro={-1.2}
             vacio={t.hueco}
             pie={semana ? t.manta(semana) : t.principal}
