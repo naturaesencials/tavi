@@ -1,5 +1,5 @@
 import { T, type Idioma } from '@/lib/idioma'
-import Fondo from './fondo'
+import Fondo, { Ilustracion } from './fondo'
 import Marco, { elegirMarco } from './marco'
 
 export type FotoHoja = {
@@ -11,6 +11,7 @@ export type FotoHoja = {
   lugar: string | null
   ancho: number | null
   alto: number | null
+  fecha: string | null
   categoria: string | null
   qr: string | null
   duracion: number | null
@@ -104,7 +105,7 @@ function componer(
   if (resto.length) {
     // Una sola tira siempre que sea posible: dos tiras ocupan mucho más alto
     // que una, y era lo que echaba abajo las composiciones con pareja.
-    const porTira = resto.length > 6 ? Math.ceil(resto.length / 2) : resto.length
+    const porTira = resto.length > 3 ? Math.ceil(resto.length / 2) : resto.length
     for (let i = 0; i < resto.length; i += porTira)
       bandas.push({ clase: 'fotos', fotos: resto.slice(i, i + porTira) })
   }
@@ -117,7 +118,26 @@ function componer(
 
 /** Ancho de una tira suelta: una foto vertical sola no debe comerse media
  *  página solo porque le sobre sitio a lo ancho. */
-const anchoTira = (suma: number) => Math.min(1, suma / 2.4)
+const anchoTira = (suma: number) => Math.min(1, suma / 1.85)
+
+/** Superficie total ocupada por fotografía, en anchos de columna al cuadrado.
+ *  Es el criterio que manda: es un álbum de fotos, no un libro ilustrado. */
+function superficie(bandas: Banda[], anchoFoto: number) {
+  let area = 0
+  for (const b of bandas) {
+    if (b.clase === 'texto') continue
+    if (b.clase === 'pareja') {
+      for (const im of b.fotos)
+        area += (anchoFoto * anchoFoto) / proporcion(im)
+    } else {
+      const suma = b.fotos.reduce((t, im) => t + proporcion(im), 0)
+      const an = anchoTira(suma)
+      for (const im of b.fotos)
+        area += ((an * an) / (suma * suma)) * proporcion(im)
+    }
+  }
+  return area
+}
 
 /** Altura estimada de la composición, en anchos de columna. Permite elegir el
  *  cuerpo de letra y el tamaño de foto más generosos que quepan en la hoja. */
@@ -147,6 +167,24 @@ function altura(
     }
   }
   return total + hueco * Math.max(0, bandas.length - 1)
+}
+
+function PieFoto({ im }: { im: FotoHoja }) {
+  const texto = im.titulo ?? im.fecha
+  if (!texto) return null
+  return (
+    <figcaption
+      style={{
+        marginTop: '4px',
+        fontSize: '0.58rem',
+        lineHeight: 1.3,
+        color: SUAVE,
+      }}
+    >
+      {texto}
+      {im.titulo && im.fecha ? ` · ${im.fecha}` : ''}
+    </figcaption>
+  )
 }
 
 function Imagen({
@@ -242,9 +280,9 @@ export default function Hoja({
 
   // Presupuesto de altura del cuerpo, en anchos de columna. Lo que se llevan
   // cabecera, pie, medidas y nota se descuenta de aquí.
-  let disponible = 1.2
-  if (esSemana) disponible -= 0.11
-  if (nota) disponible -= 0.15
+  let disponible = 1.26
+  if (esSemana) disponible -= 0.1
+  if (nota) disponible -= 0.14
   if (qrs.length) disponible -= 0.07
 
   const parrafos = (texto ?? '').split('\n\n').filter(Boolean)
@@ -253,7 +291,7 @@ export default function Hoja({
   // primera que entra: primero muchas parejas, luego fotos grandes, luego
   // letra grande. Lo que no cabe en pareja baja a una tira horizontal.
   const FUENTES = [0.03, 0.0282, 0.0265, 0.025, 0.0235, 0.022, 0.0206, 0.0192, 0.0178]
-  const ANCHOS = [0.58, 0.54, 0.5, 0.46, 0.42, 0.38]
+  const ANCHOS = [0.68, 0.64, 0.6, 0.56, 0.52, 0.48, 0.44]
   const HUECO = 0.035
   const maxParejas = Math.min(3, imagenes.length)
 
@@ -273,7 +311,10 @@ export default function Hoja({
           if (h > disponible) continue
           // Se premia llenar la hoja, tener más parejas y dejar el menor
           // número de tiras sueltas colgando del diseño.
-          const nota = h + par * 0.06 - sueltas * 0.05
+          // Manda la superficie de foto; llenar la hoja y tener parejas
+          // solo desempatan.
+          const nota =
+            superficie(cand, an) * 3 + h * 0.4 + par * 0.05 - sueltas * 0.04
           if (nota > mejor) {
             mejor = nota
             bandas = cand
@@ -420,21 +461,21 @@ export default function Hoja({
                   }}
                 >
                   {b.fotos.map((im, j) => (
-                    <div
+                    <figure
                       key={im.id}
-                      style={{
-                        flex: `${proporcion(im)} 1 0`,
-                        aspectRatio: String(proporcion(im)),
-                      }}
+                      style={{ flex: `${proporcion(im)} 1 0`, margin: 0 }}
                     >
-                      <Imagen
-                        im={im}
-                        esPrincipal={false}
-                        indice={desde + j}
-                        clavePagina={titulo}
-                        vacio={t.hueco}
-                      />
-                    </div>
+                      <div style={{ aspectRatio: String(proporcion(im)) }}>
+                        <Imagen
+                          im={im}
+                          esPrincipal={false}
+                          indice={desde + j}
+                          clavePagina={titulo}
+                          vacio={t.hueco}
+                        />
+                      </div>
+                      <PieFoto im={im} />
+                    </figure>
                   ))}
                 </div>
               )
@@ -450,15 +491,18 @@ export default function Hoja({
                 }}
               >
                 {b.fotos.map((im, j) => (
-                  <div key={im.id} style={{ aspectRatio: String(proporcion(im)) }}>
-                    <Imagen
-                      im={im}
-                      esPrincipal={i === 0 && j === 0}
-                      indice={desde + j}
-                      clavePagina={titulo}
-                      vacio={t.hueco}
-                    />
-                  </div>
+                  <figure key={im.id} style={{ margin: 0 }}>
+                    <div style={{ aspectRatio: String(proporcion(im)) }}>
+                      <Imagen
+                        im={im}
+                        esPrincipal={i === 0 && j === 0}
+                        indice={desde + j}
+                        clavePagina={titulo}
+                        vacio={t.hueco}
+                      />
+                    </div>
+                    <PieFoto im={im} />
+                  </figure>
                 ))}
               </div>
             )
@@ -490,7 +534,16 @@ export default function Hoja({
             )
           })}
 
-          {bandas.length === 0 && (
+          {imagenes.length === 0 && (
+            <Ilustracion
+              clave={titulo}
+              tipo={tipo}
+              texto={texto}
+              altura={texto ? '30%' : '55%'}
+            />
+          )}
+
+          {bandas.length === 0 && !texto && imagenes.length === 0 && (
             <p style={{ fontSize: '0.88rem', color: SUAVE, fontStyle: 'italic' }}>
               {t.sinCuento}
             </p>

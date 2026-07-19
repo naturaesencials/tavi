@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type EstiloMarco = 'mano' | 'nube' | 'sello' | 'esquineras' | 'cinta' | 'ondas'
+export type EstiloMarco = 'mano' | 'sello' | 'esquineras' | 'cinta'
 
 const TRAZO = '#5A665C'
 
@@ -17,29 +17,21 @@ function semilla(id: string, salto = 0) {
 
 /** Elige marco imitando a un niño que va cambiando de idea, pero sin dejar
  *  que los recortes se coman documentos. */
-// Nube y ondas recortan la imagen, así que no tocan documentos: en una
-// ecografía el dato suele estar pegado al borde.
-const SEGUROS: EstiloMarco[] = ['esquineras', 'mano', 'sello', 'cinta']
-const TODOS: EstiloMarco[] = ['mano', 'ondas', 'sello', 'cinta', 'esquineras']
+// Ningún marco recorta la imagen: es un álbum de fotos y la foto manda.
+const BARAJA: EstiloMarco[] = ['mano', 'esquineras', 'sello', 'cinta']
 
 export function elegirMarco(
-  id: string,
-  categoria: string | null,
-  esPrincipal: boolean,
+  _id: string,
+  _categoria: string | null,
+  _esPrincipal: boolean,
   indice = 0,
   clavePagina = ''
 ): EstiloMarco {
-  const documento =
-    categoria === 'ecografia' || categoria === 'test' || categoria === 'otro'
-
-  if (!documento && esPrincipal && semilla(id, 7) < 0.45) return 'nube'
-
   // La página decide por dónde empieza la baraja y a partir de ahí se rota
   // foto a foto, como quien va gastando pegatinas distintas en vez de
   // repetir la misma cuatro veces.
-  const baraja = documento ? SEGUROS : TODOS
-  const arranque = Math.floor(semilla(clavePagina, 3) * baraja.length)
-  return baraja[(arranque + indice) % baraja.length]
+  const arranque = Math.floor(semilla(clavePagina, 3) * BARAJA.length)
+  return BARAJA[(arranque + indice) % BARAJA.length]
 }
 
 /** Rectángulo dibujado a pulso: cada lado se desvía un poco de la recta. */
@@ -54,20 +46,6 @@ function trazoAMano(id: string, salto: number) {
     C${x1 + d(10)} ${28 + d(11, 9)}, ${x1 + d(12)} ${70 + d(13, 9)}, ${x1 + d(14)} ${y1}
     C${72 + d(15, 8)} ${y1 + d(16)}, ${30 + d(17, 8)} ${y1 + d(18)}, ${x0 + d(19)} ${y1 + d(20)}
     C${x0 + d(21)} ${68 + d(22, 9)}, ${x0 + d(23)} ${26 + d(24, 9)}, ${x0} ${y0} Z`
-}
-
-function nube() {
-  const p: string[] = ['M6 12']
-  for (let i = 0; i < 6; i++) p.push('a7.8 7.8 0 0 1 15.6 0')
-  for (let i = 0; i < 5; i++) p.push('a7.5 7.5 0 0 1 0 15')
-  for (let i = 0; i < 6; i++) p.push('a7.8 7.8 0 0 1 -15.6 0')
-  for (let i = 0; i < 5; i++) p.push('a7.5 7.5 0 0 1 0 -15')
-  return p.join(' ') + ' Z'
-}
-
-function ondas() {
-  return `M2 6 q8 -5 16 0 t16 0 t16 0 t16 0 t16 0 t16 0
-          L98 94 q-8 5 -16 0 t-16 0 t-16 0 t-16 0 t-16 0 t-16 0 Z`
 }
 
 function Esquineras() {
@@ -126,28 +104,12 @@ export default function Marco({
   estilo: EstiloMarco
   children: ReactNode
 }) {
-  const clipId = `recorte-${id}`
-  const forma =
-    estilo === 'nube' ? nube() : estilo === 'ondas' ? ondas() : null
-  const recorta = forma !== null
-
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {recorta && (
-        <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
-          <defs>
-            <clipPath id={clipId} clipPathUnits="objectBoundingBox">
-              <path d={forma!.replace(/[\d.]+/g, (n) => String(Number(n) / 100))} />
-            </clipPath>
-          </defs>
-        </svg>
-      )}
-
       <div
         style={{
           width: '100%',
           height: '100%',
-          clipPath: recorta ? `url(#${clipId})` : undefined,
           borderRadius: estilo === 'mano' ? '3px' : undefined,
           overflow: 'hidden',
         }}
@@ -188,16 +150,6 @@ export default function Marco({
               strokeLinejoin="round"
             />
           </>
-        )}
-        {(estilo === 'nube' || estilo === 'ondas') && (
-          <path
-            d={forma!}
-            fill="none"
-            stroke={TRAZO}
-            strokeWidth="1.7"
-            vectorEffect="non-scaling-stroke"
-            strokeLinejoin="round"
-          />
         )}
         {estilo === 'sello' && (
           <rect

@@ -109,6 +109,66 @@ function semilla(clave: string, salto: number) {
   return ((h >>> 0) % 10000) / 10000
 }
 
+/** Dibujos grandes para las páginas sin fotografías: en vez de una plancha
+ *  de texto, la escena que cuenta la página, dibujada a línea. */
+export function Ilustracion({
+  clave,
+  tipo,
+  texto,
+  altura,
+}: {
+  clave: string
+  tipo: string
+  texto: string | null
+  altura: string
+}) {
+  const base = TEMAS[tipo] ?? TEMAS.semana
+  const porTexto = texto
+    ? PALABRAS.filter(([re]) => re.test(texto)).map(([, n]) => n)
+    : []
+  const elegidos = Array.from(new Set([...porTexto, ...base])).slice(0, 3)
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        gap: '4%',
+        height: altura,
+      }}
+    >
+      {elegidos.map((nombre, i) => {
+        const dib = DIBUJOS[nombre]
+        if (!dib) return null
+        const giro = (semilla(clave + nombre, i + 9) - 0.5) * 16
+        const escala = i === 0 ? 1 : 0.74
+        return (
+          <svg
+            key={nombre}
+            viewBox="0 0 100 100"
+            style={{
+              height: `${escala * 100}%`,
+              transform: `rotate(${giro}deg)`,
+              overflow: 'visible',
+            }}
+            aria-hidden
+          >
+            <path
+              d={dib.d}
+              fill="none"
+              stroke="#A9B5AB"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Fondo({
   clave,
   tipo,

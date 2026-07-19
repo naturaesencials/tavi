@@ -61,6 +61,10 @@ export default async function PaginaAlbum({
   const base =
     process.env.NEXT_PUBLIC_URL_PUBLICA ?? 'https://tavi-phi.vercel.app'
 
+  // Un A4 con texto no admite más de tres fotos si han de verse bien. Lo que
+  // pase de ahí continúa en otra hoja de la misma página.
+  const POR_HOJA = 3
+
   const imagenes: FotoHoja[] = await Promise.all(
     (fotos ?? []).map(async (f) => {
       const ficha = (f as unknown as { ficha_publica: string | null })
@@ -82,6 +86,16 @@ export default async function PaginaAlbum({
         titulo: elige(f.titulo, f.titulo_en, idioma),
         lugar: f.lugar,
         categoria: (f as unknown as { categoria: string | null }).categoria,
+        fecha: f.tomada_en
+          ? new Intl.DateTimeFormat(idioma === 'en' ? 'en-GB' : 'es-ES', {
+              timeZone:
+                (f as unknown as { zona_horaria: string }).zona_horaria ??
+                'Europe/Madrid',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            }).format(new Date(f.tomada_en))
+          : null,
         ancho: (f as unknown as { ancho: number | null }).ancho,
         alto: (f as unknown as { alto: number | null }).alto,
         duracion: (f as unknown as { duracion_s: number | null }).duracion_s,
@@ -129,6 +143,24 @@ export default async function PaginaAlbum({
           : fechaLarga(pagina.fecha_inicio)
         : (elige(album.subtitulo, album.subtitulo_en, idioma) ?? '')
 
+  // Se reparte el texto entre las hojas en proporción a las fotos de cada
+  // una, para que ninguna quede con la plancha entera y otra en blanco.
+  const parrafosPagina = (
+    elige(pagina.texto_cuento, pagina.texto_cuento_en, idioma) ?? ''
+  )
+    .split('\n\n')
+    .filter(Boolean)
+
+  const nHojas = Math.max(1, Math.ceil(imagenes.length / POR_HOJA))
+  const grupos = Array.from({ length: nHojas }, (_, i) => {
+    const desde = Math.ceil((parrafosPagina.length * i) / nHojas)
+    const hasta = Math.ceil((parrafosPagina.length * (i + 1)) / nHojas)
+    return {
+      fotos: imagenes.slice(i * POR_HOJA, (i + 1) * POR_HOJA),
+      texto: parrafosPagina.slice(desde, hasta).join('\n\n') || null,
+    }
+  })
+
   return (
     <main className="mx-auto min-h-dvh max-w-5xl px-4 py-10">
       <nav className="mb-8 flex items-center justify-between gap-4">
@@ -164,15 +196,17 @@ export default async function PaginaAlbum({
         </div>
       </nav>
 
+      {grupos.map((grupo, i) => (
       <Hoja
+        key={i}
         encabezado={encabezado}
         idioma={idioma}
         tipo={pagina.tipo}
-        esSemana={pagina.tipo === 'semana'}
+        esSemana={pagina.tipo === 'semana' && i === grupos.length - 1}
         titulo={
-          elige(pagina.titulo, pagina.titulo_en, idioma) ??
-          elige(album.titulo, album.titulo_en, idioma) ??
-          ''
+          (elige(pagina.titulo, pagina.titulo_en, idioma) ??
+            elige(album.titulo, album.titulo_en, idioma) ??
+            '') + (i > 0 ? (idioma === 'en' ? ' (continues)' : ' (sigue)') : '')
         }
         subtitulo={subtitulo}
         lugarPie={
@@ -180,20 +214,29 @@ export default async function PaginaAlbum({
             ? `${t.semanas} ${pagina.numero_semana}`
             : (album.subtitulo ?? '')
         }
-        texto={elige(pagina.texto_cuento, pagina.texto_cuento_en, idioma)}
-        notaTitulo={elige(
-          pagina.nota_mundo_titulo,
-          pagina.nota_mundo_titulo_en,
-          idioma
-        )}
-        nota={elige(pagina.nota_mundo, pagina.nota_mundo_en, idioma)}
+        texto={grupo.texto}
+        notaTitulo={
+          i === grupos.length - 1
+            ? elige(
+                pagina.nota_mundo_titulo,
+                pagina.nota_mundo_titulo_en,
+                idioma
+              )
+            : null
+        }
+        nota={
+          i === grupos.length - 1
+            ? elige(pagina.nota_mundo, pagina.nota_mundo_en, idioma)
+            : null
+        }
         pesoG={pagina.peso_g}
         tallaMm={pagina.talla_mm}
         cabezaMm={pagina.cabeza_mm}
         semana={pagina.numero_semana}
-        imagenes={imagenes}
+        imagenes={grupo.fotos}
         pie={elige(album.titulo, album.titulo_en, idioma) ?? ''}
       />
+      ))}
 
       <p className="mt-6 text-center text-[0.8rem] text-pino/50">
         {t.aviso}
