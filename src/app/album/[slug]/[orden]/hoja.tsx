@@ -1,6 +1,7 @@
 import { T, type Idioma } from '@/lib/idioma'
-import Fondo, { Ilustracion } from './fondo'
+import Fondo from './fondo'
 import Marco, { elegirMarco } from './marco'
+import { PAGINA, UTIL, CALLE, maquetar, type Pieza } from '@/lib/maqueta'
 
 export type FotoHoja = {
   id: string
@@ -17,224 +18,47 @@ export type FotoHoja = {
   duracion: number | null
 }
 
-const PAPEL = '#FCF8F0'
-const TINTA = '#28322C'
-const SUAVE = '#7A8A80'
-const RAYA = '#D8DCD4'
+const PAPEL = '#FDF8EE'
+const TINTA = '#2F3E38'
+const SUAVE = '#7C8A82'
 
-// El color ya no tiñe la página: solo marca el tramo en un filete y en el
-// rótulo. Se reconoce la sección sin que la hoja se vuelva un cromo.
-const ACENTO: Record<string, string> = {
-  portada: '#C4623C',
-  nombre: '#B98A20',
-  embarazo: '#B85572',
-  origen: '#2E8B8B',
-  hito: '#C4623C',
-  viaje: '#3E86B8',
-  ciudad: '#578F52',
-  nacimiento: '#B85572',
-  semana: '#B98A20',
-  cumple: '#C4623C',
+/** Color de cada tramo del álbum. Tiñe el fondo de línea, el subrayado del
+ *  título, el círculo del número de página y el marco de la foto destacada. */
+const TRAMOS = {
+  antes: '#6E8C6A',
+  naces: '#D9614A',
+  otono: '#C9962B',
+  invierno: '#5D8CA8',
+  primavera: '#5F9E63',
+  verano: '#B85C3C',
+} as const
+
+function colorDeTramo(tipo: string, semana: number | null): string {
+  if (tipo === 'nacimiento' || tipo === 'ciudad') return TRAMOS.naces
+  if (semana === null) return tipo === 'cumple' ? TRAMOS.verano : TRAMOS.antes
+  if (semana <= 13) return TRAMOS.otono
+  if (semana <= 26) return TRAMOS.invierno
+  if (semana <= 39) return TRAMOS.primavera
+  return TRAMOS.verano
 }
 
-const proporcion = (im: FotoHoja) =>
-  im.ancho && im.alto ? im.ancho / im.alto : 1.4
+/* Tipografía en milímetros de papel, no en rem de pantalla. 4,4 mm son unos
+   12,5 pt: lo que un niño puede seguir con el dedo. */
+const CUERPO = 4.4
+const INTERLINEA = 1.55
+const LINEA = CUERPO * INTERLINEA
 
-/** Trocea el texto para que haya al menos un bloque por foto emparejada,
- *  partiendo por frases cuando no hay párrafos suficientes. */
-function trocear(parrafos: string[], minimo: number) {
-  const trozos = [...parrafos]
-  // Sin texto no hay nada que trocear: las páginas vacías (portada, semanas
-  // sin escribir) llegaban aquí y reventaban al buscar frases que no existen.
-  if (trozos.length === 0) return trozos
-  while (trozos.length < minimo) {
-    let i = 0
-    for (let j = 1; j < trozos.length; j++)
-      if (trozos[j].length > trozos[i].length) i = j
-    const frases = trozos[i].match(/[^.!?]+[.!?]+\s*/g)
-    if (!frases || frases.length < 2) break
-    const mitad = Math.ceil(frases.length / 2)
-    trozos.splice(
-      i,
-      1,
-      frases.slice(0, mitad).join('').trim(),
-      frases.slice(mitad).join('').trim()
-    )
-  }
-  return trozos
-}
-
-type Banda =
-  | { clase: 'pareja'; fotos: FotoHoja[]; texto: string; ladoFoto: 'izq' | 'der' }
-  | { clase: 'fotos'; fotos: FotoHoja[] }
-  | { clase: 'texto'; texto: string }
-
-/** Empareja fotos con trozos de historia alternando el lado, como en una
- *  revista. Las fotos que no entran en pareja bajan a una tira horizontal,
- *  que ocupa mucha menos altura que otra pareja. */
-function componer(
-  imagenes: FotoHoja[],
-  trozos: string[],
-  parejas: number,
-  apilar: boolean
-): Banda[] {
-  const bandas: Banda[] = []
-  const n = Math.min(parejas, imagenes.length, trozos.length)
-
-  // Las fotos que sobran se reparten en la columna de cada pareja, apiladas
-  // bajo la primera. Así pertenecen a la rejilla en vez de quedarse sueltas.
-  const porColumna: FotoHoja[][] = []
-  let usadas = n
-  for (let i = 0; i < n; i++) porColumna.push([imagenes[i]])
-  if (apilar) {
-    for (let i = 0; i < n && usadas < imagenes.length; i++) {
-      porColumna[i].push(imagenes[usadas])
-      usadas++
-    }
-  }
-
-  for (let i = 0; i < n; i++)
-    bandas.push({
-      clase: 'pareja',
-      fotos: porColumna[i],
-      texto: trozos[i],
-      ladoFoto: i % 2 === 0 ? 'izq' : 'der',
-    })
-
-  const resto = imagenes.slice(usadas)
-  if (resto.length) {
-    // Una sola tira siempre que sea posible: dos tiras ocupan mucho más alto
-    // que una, y era lo que echaba abajo las composiciones con pareja.
-    const porTira = resto.length > 3 ? Math.ceil(resto.length / 2) : resto.length
-    for (let i = 0; i < resto.length; i += porTira)
-      bandas.push({ clase: 'fotos', fotos: resto.slice(i, i + porTira) })
-  }
-
-  for (let i = n; i < trozos.length; i++)
-    bandas.push({ clase: 'texto', texto: trozos[i] })
-
-  return bandas
-}
-
-/** Ancho de una tira suelta: una foto vertical sola no debe comerse media
- *  página solo porque le sobre sitio a lo ancho. */
-const anchoTira = (suma: number) => Math.min(1, suma / 1.85)
-
-/** Superficie total ocupada por fotografía, en anchos de columna al cuadrado.
- *  Es el criterio que manda: es un álbum de fotos, no un libro ilustrado. */
-function superficie(bandas: Banda[], anchoFoto: number) {
-  let area = 0
-  for (const b of bandas) {
-    if (b.clase === 'texto') continue
-    if (b.clase === 'pareja') {
-      for (const im of b.fotos)
-        area += (anchoFoto * anchoFoto) / proporcion(im)
-    } else {
-      const suma = b.fotos.reduce((t, im) => t + proporcion(im), 0)
-      const an = anchoTira(suma)
-      for (const im of b.fotos)
-        area += ((an * an) / (suma * suma)) * proporcion(im)
-    }
-  }
-  return area
-}
-
-/** Altura estimada de la composición, en anchos de columna. Permite elegir el
- *  cuerpo de letra y el tamaño de foto más generosos que quepan en la hoja. */
-function altura(
-  bandas: Banda[],
-  fuente: number,
-  anchoFoto: number,
-  hueco: number
-) {
-  const linea = fuente * 1.68
-  let total = 0
-  for (const b of bandas) {
-    if (b.clase === 'fotos') {
-      const suma = b.fotos.reduce((t, im) => t + proporcion(im), 0)
-      total += anchoTira(suma) / suma
-    } else if (b.clase === 'texto') {
-      const porLinea = 1 / (fuente * 0.47)
-      total += Math.ceil(b.texto.length / porLinea) * linea
-    } else {
-      const anchoTexto = 1 - anchoFoto - 0.045
-      const porLinea = anchoTexto / (fuente * 0.47)
-      const hTexto = Math.ceil(b.texto.length / porLinea) * linea
-      const hFoto =
-        b.fotos.reduce((t, im) => t + anchoFoto / proporcion(im), 0) +
-        (b.fotos.length - 1) * 0.02
-      total += Math.max(hTexto, hFoto)
-    }
-  }
-  return total + hueco * Math.max(0, bandas.length - 1)
-}
-
-function PieFoto({ im }: { im: FotoHoja }) {
-  const texto = im.titulo ?? im.fecha
-  if (!texto) return null
-  return (
-    <figcaption
-      style={{
-        marginTop: '4px',
-        fontSize: '0.58rem',
-        lineHeight: 1.3,
-        color: SUAVE,
-      }}
-    >
-      {texto}
-      {im.titulo && im.fecha ? ` · ${im.fecha}` : ''}
-    </figcaption>
+/** Alto que ocupará un texto. Estimación por caracteres: no hace falta ser
+ *  exacto, solo no pasarse, porque el sobrante se lo quedan las fotos. */
+function altoDeTexto(parrafos: string[], ancho: number): number {
+  const porLinea = Math.floor(ancho / (CUERPO * 0.5))
+  return parrafos.reduce(
+    (t, p) => t + Math.max(1, Math.ceil(p.length / porLinea)) * LINEA + 2.5,
+    0
   )
 }
 
-function Imagen({
-  im,
-  esPrincipal,
-  indice,
-  clavePagina,
-  vacio,
-}: {
-  im: FotoHoja
-  esPrincipal: boolean
-  indice: number
-  clavePagina: string
-  vacio: string
-}) {
-  const fuente = im.medio === 'video' ? im.posterUrl : im.url
-  const estilo = elegirMarco(
-    im.id,
-    im.categoria,
-    esPrincipal,
-    indice,
-    clavePagina
-  )
-  return (
-    <Marco id={im.id} estilo={estilo}>
-      <div
-        data-foto
-        style={{
-          width: '100%',
-          height: '100%',
-          background: '#E6E9E2',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {fuente ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={fuente}
-            alt={im.titulo ?? ''}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        ) : (
-          <span style={{ color: SUAVE, fontSize: '0.68rem' }}>{vacio}</span>
-        )}
-      </div>
-    </Marco>
-  )
-}
+const mm = (n: number) => `calc(${n} * var(--mm))`
 
 export default function Hoja({
   idioma,
@@ -253,6 +77,7 @@ export default function Hoja({
   imagenes,
   pie,
   esSemana,
+  sangrado = false,
 }: {
   idioma: Idioma
   tipo: string
@@ -270,410 +95,343 @@ export default function Hoja({
   imagenes: FotoHoja[]
   pie: string
   esSemana: boolean
+  /** Añade 3 mm de papel por cada lado para que la imprenta recorte. */
+  sangrado?: boolean
 }) {
   const t = T[idioma]
-  const acento = ACENTO[tipo] ?? '#C4623C'
+  const acento = colorDeTramo(tipo, semana)
   const medida = (v: number | null, div: number, u: string) =>
     v === null ? '—' : `${(v / div).toLocaleString('es-ES')} ${u}`
 
+  const parrafos = (texto ?? '').split('\n\n').filter(Boolean)
   const qrs = imagenes.filter((im) => im.medio === 'video' && im.qr)
 
-  // Presupuesto de altura del cuerpo, en anchos de columna. Lo que se llevan
-  // cabecera, pie, medidas y nota se descuenta de aquí.
-  let disponible = 1.26
-  if (esSemana) disponible -= 0.1
-  if (nota) disponible -= 0.14
-  if (qrs.length) disponible -= 0.07
+  /* Presupuesto vertical, en milímetros. La cabecera y el pie son fijos; el
+     texto se mide; lo que sobra es de las fotos. Antes esto iba en
+     porcentajes y por eso nada tenía un tamaño real. */
+  const ALTO_CABECERA = 26
+  const ALTO_PIE = 10
+  const altoNota = nota ? altoDeTexto([nota], UTIL.ancho - 12) + 10 : 0
+  const altoMedidas = esSemana ? 9 : 0
+  const altoTextos = altoDeTexto(parrafos, UTIL.ancho)
 
-  const parrafos = (texto ?? '').split('\n\n').filter(Boolean)
+  const altoFotos = Math.max(
+    0,
+    UTIL.alto - ALTO_CABECERA - ALTO_PIE - altoNota - altoMedidas - altoTextos - 6
+  )
 
-  // Se prueban composiciones de más generosa a más apretada y se toma la
-  // primera que entra: primero muchas parejas, luego fotos grandes, luego
-  // letra grande. Lo que no cabe en pareja baja a una tira horizontal.
-  const FUENTES = [0.03, 0.0282, 0.0265, 0.025, 0.0235, 0.022, 0.0206, 0.0192, 0.0178]
-  const ANCHOS = [0.68, 0.64, 0.6, 0.56, 0.52, 0.48, 0.44]
-  const HUECO = 0.035
-  const maxParejas = Math.min(3, imagenes.length)
+  const piezas: Pieza[] = imagenes.map((im) => ({
+    id: im.id,
+    ancho: im.ancho,
+    alto: im.alto,
+  }))
+  const maqueta = maquetar(piezas, UTIL.ancho, altoFotos)
+  const porId = new Map(imagenes.map((im) => [im.id, im]))
 
-  let bandas = componer(imagenes, parrafos, 0, false)
-  let fuenteRel = FUENTES[FUENTES.length - 1]
-  let anchoFoto = 0.42
-  let mejor = -1
-
-  for (let par = maxParejas; par >= 0; par--) {
-    const trozos = trocear(parrafos, Math.max(par, 1))
-    for (const apilar of [true, false]) {
-      const cand = componer(imagenes, trozos, par, apilar)
-      const sueltas = cand.filter((b) => b.clase === 'fotos').length
-      for (const an of ANCHOS) {
-        for (const fu of FUENTES) {
-          const h = altura(cand, fu, an, HUECO)
-          if (h > disponible) continue
-          // Se premia llenar la hoja, tener más parejas y dejar el menor
-          // número de tiras sueltas colgando del diseño.
-          // Manda la superficie de foto; llenar la hoja y tener parejas
-          // solo desempatan.
-          const nota =
-            superficie(cand, an) * 3 + h * 0.4 + par * 0.05 - sueltas * 0.04
-          if (nota > mejor) {
-            mejor = nota
-            bandas = cand
-            anchoFoto = an
-            fuenteRel = fu
-          }
-        }
-      }
-    }
+  /* Se intercala: una fila de fotos, un párrafo, otra fila, otro párrafo.
+     Un ladrillo de texto de 300 palabras al pie es mucho para un niño. */
+  const bloques: Array<
+    { tipo: 'fotos'; indice: number } | { tipo: 'texto'; texto: string }
+  > = []
+  const total = Math.max(maqueta.filas.length, parrafos.length)
+  for (let i = 0; i < total; i++) {
+    if (i < maqueta.filas.length) bloques.push({ tipo: 'fotos', indice: i })
+    if (i < parrafos.length) bloques.push({ tipo: 'texto', texto: parrafos[i] })
   }
 
-  // De fracción de columna a rem: la columna mide 46,8rem de ancho máximo.
-  const cuerpoRem = `${(fuenteRel * 46.8).toFixed(2)}rem`
-
+  const anchoPapel = PAGINA.ancho + (sangrado ? PAGINA.sangrado * 2 : 0)
+  const altoPapel = PAGINA.alto + (sangrado ? PAGINA.sangrado * 2 : 0)
+  const desplazamiento = sangrado ? PAGINA.sangrado : 0
 
   return (
-    <article
-      className="font-display"
+    <div
+      className="hoja-envoltura"
       style={{
-        position: 'relative',
+        containerType: 'inline-size',
         width: '100%',
-        maxWidth: '52rem',
+        maxWidth: `${anchoPapel}mm`,
         margin: '0 auto',
-        aspectRatio: '210 / 297',
-        background: PAPEL,
-        color: TINTA,
-        padding: '4.4% 5% 3.2%',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        boxShadow: '0 2px 16px rgba(90,80,60,0.13)',
       }}
     >
-      <Fondo clave={titulo} tipo={tipo} texto={texto} />
-
-      <div
-        style={{
-          position: 'relative',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          minHeight: 0,
-        }}
+      <article
+        className="hoja"
+        style={
+          {
+            /* La clave de todo: un milímetro de papel. En pantalla vale lo
+               que dé el ancho disponible; al imprimir vale un milímetro de
+               verdad. Así la pantalla y el papel son la misma página. */
+            '--mm': `calc(100cqi / ${anchoPapel})`,
+            position: 'relative',
+            width: mm(anchoPapel),
+            height: mm(altoPapel),
+            background: PAPEL,
+            color: TINTA,
+            overflow: 'hidden',
+            boxShadow: '0 2px 16px rgba(90,80,60,0.13)',
+          } as React.CSSProperties
+        }
       >
-        <header style={{ flexShrink: 0 }}>
-          <p
-            style={{
-              fontSize: '0.6rem',
-              letterSpacing: '3.2px',
-              color: SUAVE,
-              textTransform: 'uppercase',
-            }}
-          >
-            {encabezado}
-          </p>
-          <div
-            style={{
-              height: '1.6px',
-              background: acento,
-              marginTop: '0.7%',
-            }}
+        <div
+          style={{
+            position: 'absolute',
+            left: mm(desplazamiento),
+            top: mm(desplazamiento),
+            width: mm(PAGINA.ancho),
+            height: mm(PAGINA.alto),
+          }}
+        >
+          <Fondo
+            clave={`${tipo}-${semana ?? titulo}`}
+            tipo={tipo}
+            texto={texto}
+            color={acento}
+            opacidad={0.2}
           />
-          <h1
-            style={{
-              fontSize: 'clamp(1.4rem,4vw,2.35rem)',
-              lineHeight: 1.06,
-              marginTop: '1.6%',
-              fontWeight: 400,
-            }}
-          >
-            {titulo}
-          </h1>
-          <div
-            style={{
-              height: '1px',
-              background: RAYA,
-              marginTop: '1.4%',
-            }}
-          />
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: '10px',
-              marginTop: '1%',
-              fontSize: '0.6rem',
-              letterSpacing: '1.4px',
-              color: SUAVE,
-              textTransform: 'uppercase',
-            }}
-          >
-            <span>{subtitulo}</span>
-            <span>{lugarPie}</span>
-          </div>
-        </header>
+        </div>
 
         <div
           style={{
-            marginTop: '3.2%',
+            position: 'absolute',
+            left: mm(desplazamiento + PAGINA.margenInterior),
+            top: mm(desplazamiento + PAGINA.margenSuperior),
+            width: mm(UTIL.ancho),
+            height: mm(UTIL.alto),
             display: 'flex',
             flexDirection: 'column',
-            gap: `${HUECO * 100}%`,
-            flex: 1,
-            minHeight: 0,
-            justifyContent: 'space-between',
           }}
         >
-          {bandas.map((b, i) => {
-            const desde = bandas
-              .slice(0, i)
-              .reduce(
-                (n, x) => n + (x.clase === 'texto' ? 0 : x.fotos.length),
-                0
-              )
+          <header style={{ height: mm(ALTO_CABECERA), flexShrink: 0 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: mm(2.9),
+                letterSpacing: mm(0.22),
+                textTransform: 'uppercase',
+                color: SUAVE,
+              }}
+            >
+              {encabezado}
+            </p>
+            <h1
+              style={{
+                margin: mm(1.5) + ' 0 0',
+                fontSize: mm(10),
+                fontStyle: 'italic',
+                fontWeight: 400,
+                lineHeight: 1.05,
+              }}
+            >
+              {titulo}
+            </h1>
+            <svg
+              viewBox="0 0 100 4"
+              preserveAspectRatio="none"
+              aria-hidden
+              style={{ display: 'block', width: mm(52), height: mm(2.2) }}
+            >
+              <path
+                d="M1 2.6C22 1.2 52 1.1 99 2.1"
+                fill="none"
+                stroke={acento}
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+            <p style={{ margin: mm(1) + ' 0 0', fontSize: mm(3.3), color: SUAVE }}>
+              {subtitulo}
+              {lugarPie ? ` · ${lugarPie}` : ''}
+            </p>
+          </header>
 
-            if (b.clase === 'texto')
-              return (
+          <div style={{ flex: 1, minHeight: 0 }}>
+            {bloques.map((b, i) =>
+              b.tipo === 'fotos' ? (
+                <div
+                  key={`f${i}`}
+                  style={{
+                    display: 'flex',
+                    gap: mm(CALLE),
+                    marginBottom: mm(CALLE),
+                    justifyContent: 'center',
+                  }}
+                >
+                  {maqueta.filas[b.indice].fotos.map((enc, j) => {
+                    const im = porId.get(enc.id)
+                    if (!im) return null
+                    const fuente = im.medio === 'video' ? im.posterUrl : im.url
+                    return (
+                      <figure
+                        key={enc.id}
+                        style={{
+                          margin: 0,
+                          width: mm(enc.ancho),
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div style={{ width: '100%', height: mm(enc.alto) }}>
+                          <Marco
+                            id={im.id}
+                            estilo={elegirMarco(
+                              im.id,
+                              im.categoria,
+                              b.indice === 0 && j === 0,
+                              j,
+                              `${tipo}-${semana ?? ''}`
+                            )}
+                          >
+                            <div
+                              data-foto
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                background: '#E6E9E2',
+                              }}
+                            >
+                              {fuente ? (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  src={fuente}
+                                  alt={im.titulo ?? ''}
+                                  style={{
+                                    /* contain, nunca cover: la foto se ve
+                                       entera o no se ve. */
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'contain',
+                                    display: 'block',
+                                  }}
+                                />
+                              ) : null}
+                            </div>
+                          </Marco>
+                        </div>
+                        {im.titulo ? (
+                          <figcaption
+                            style={{
+                              marginTop: mm(1.2),
+                              fontSize: mm(2.6),
+                              lineHeight: 1.3,
+                              color: SUAVE,
+                            }}
+                          >
+                            {im.titulo}
+                          </figcaption>
+                        ) : null}
+                      </figure>
+                    )
+                  })}
+                </div>
+              ) : (
                 <p
                   key={`t${i}`}
                   style={{
-                    fontSize: cuerpoRem,
-                    lineHeight: 1.68,
+                    margin: `0 0 ${mm(2.5)}`,
+                    fontSize: mm(CUERPO),
+                    lineHeight: INTERLINEA,
                     textAlign: 'justify',
                     hyphens: 'auto',
-                    margin: 0,
                   }}
                 >
                   {b.texto}
                 </p>
               )
+            )}
 
-            if (b.clase === 'fotos')
-              return (
-                <div
-                  key={`f${i}`}
+            {parrafos.length === 0 && imagenes.length === 0 ? (
+              <p style={{ fontSize: mm(CUERPO), color: SUAVE }}>{t.sinCuento}</p>
+            ) : null}
+          </div>
+
+          {esSemana ? (
+            <p
+              style={{
+                margin: 0,
+                fontSize: mm(3),
+                color: SUAVE,
+                flexShrink: 0,
+              }}
+            >
+              {t.peso}: {medida(pesoG, 1000, 'kg')} · {t.talla}:{' '}
+              {medida(tallaMm, 10, 'cm')} · {t.cabeza}: {medida(cabezaMm, 10, 'cm')}
+            </p>
+          ) : null}
+
+          {nota ? (
+            <aside
+              style={{
+                flexShrink: 0,
+                marginTop: mm(3),
+                borderLeft: `${mm(1)} solid ${acento}`,
+                paddingLeft: mm(4),
+              }}
+            >
+              {notaTitulo ? (
+                <h2
                   style={{
-                    display: 'flex',
-                    gap: '3%',
-                    alignItems: 'flex-start',
-                    width: `${anchoTira(b.fotos.reduce((t, im) => t + proporcion(im), 0)) * 100}%`,
-                    alignSelf: i % 2 === 1 ? 'flex-end' : 'flex-start',
-                    borderTop: `1px solid ${RAYA}`,
-                    paddingTop: '1.6%',
+                    margin: 0,
+                    fontSize: mm(3.6),
+                    fontWeight: 500,
+                    color: acento,
                   }}
                 >
-                  {b.fotos.map((im, j) => (
-                    <figure
-                      key={im.id}
-                      style={{ flex: `${proporcion(im)} 1 0`, margin: 0 }}
-                    >
-                      <div style={{ aspectRatio: String(proporcion(im)) }}>
-                        <Imagen
-                          im={im}
-                          esPrincipal={false}
-                          indice={desde + j}
-                          clavePagina={titulo}
-                          vacio={t.hueco}
-                        />
-                      </div>
-                      <PieFoto im={im} />
-                    </figure>
-                  ))}
-                </div>
-              )
-
-            const columna = (
-              <div
-                style={{
-                  width: `${anchoFoto * 100}%`,
-                  flexShrink: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4%',
-                }}
-              >
-                {b.fotos.map((im, j) => (
-                  <figure key={im.id} style={{ margin: 0 }}>
-                    <div style={{ aspectRatio: String(proporcion(im)) }}>
-                      <Imagen
-                        im={im}
-                        esPrincipal={i === 0 && j === 0}
-                        indice={desde + j}
-                        clavePagina={titulo}
-                        vacio={t.hueco}
-                      />
-                    </div>
-                    <PieFoto im={im} />
-                  </figure>
-                ))}
-              </div>
-            )
-
-            const cuerpoTexto = (
+                  {notaTitulo}
+                </h2>
+              ) : null}
               <p
                 style={{
-                  flex: 1,
-                  fontSize: cuerpoRem,
-                  lineHeight: 1.68,
-                  textAlign: 'justify',
-                  hyphens: 'auto',
-                  margin: 0,
-                  alignSelf: 'center',
+                  margin: mm(1) + ' 0 0',
+                  fontSize: mm(3.5),
+                  lineHeight: 1.5,
                 }}
               >
-                {b.texto}
+                {nota}
               </p>
-            )
+            </aside>
+          ) : null}
 
-            return (
-              <div
-                key={`p${i}`}
-                style={{ display: 'flex', gap: '4.5%', alignItems: 'center' }}
-              >
-                {b.ladoFoto === 'izq' ? columna : cuerpoTexto}
-                {b.ladoFoto === 'izq' ? cuerpoTexto : columna}
-              </div>
-            )
-          })}
-
-          {imagenes.length === 0 && (
-            <Ilustracion
-              clave={titulo}
-              tipo={tipo}
-              texto={texto}
-              altura={texto ? '30%' : '55%'}
-            />
-          )}
-
-          {bandas.length === 0 && !texto && imagenes.length === 0 && (
-            <p style={{ fontSize: '0.88rem', color: SUAVE, fontStyle: 'italic' }}>
-              {t.sinCuento}
-            </p>
-          )}
-        </div>
-
-        {esSemana && (
-          <section
+          <footer
             style={{
               flexShrink: 0,
-              marginTop: '2%',
-              borderTop: `1px solid ${RAYA}`,
-              borderBottom: `1px solid ${RAYA}`,
-              padding: '1.6% 0',
+              height: mm(ALTO_PIE),
               display: 'flex',
-              flexWrap: 'wrap',
-              gap: '7%',
-              fontSize: '0.8rem',
+              alignItems: 'flex-end',
+              justifyContent: 'space-between',
+              gap: mm(4),
             }}
           >
             <span
               style={{
-                width: '100%',
-                fontSize: '0.58rem',
-                letterSpacing: '2px',
-                color: acento,
-                textTransform: 'uppercase',
+                width: mm(9),
+                height: mm(9),
+                borderRadius: '50%',
+                background: acento,
+                color: PAPEL,
+                fontSize: mm(3.6),
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
-              {t.parte}
+              {semana ?? ''}
             </span>
-            <span>
-              {t.peso} {medida(pesoG, 1000, 'kg')}
-            </span>
-            <span>
-              {t.talla} {medida(tallaMm, 10, 'cm')}
-            </span>
-            <span>
-              {t.cabeza} {medida(cabezaMm, 10, 'cm')}
-            </span>
-          </section>
-        )}
-
-        {nota && (
-          <section
-            style={{
-              flexShrink: 0,
-              marginTop: '2%',
-              borderLeft: `2px solid ${acento}`,
-              paddingLeft: '2.2%',
-            }}
-          >
-            <p
-              style={{
-                fontSize: '0.56rem',
-                letterSpacing: '1.8px',
-                color: acento,
-                textTransform: 'uppercase',
-              }}
-            >
-              {t.mundo}
-            </p>
-            <p style={{ fontSize: '0.78rem', marginTop: '0.6%' }}>{notaTitulo}</p>
-            <p
-              style={{
-                fontSize: '0.71rem',
-                lineHeight: 1.5,
-                marginTop: '0.5%',
-                columnCount: 2,
-                columnGap: '16px',
-              }}
-            >
-              {nota}
-            </p>
-          </section>
-        )}
-
-        <footer
-          style={{
-            flexShrink: 0,
-            marginTop: 'auto',
-            paddingTop: '2%',
-            borderTop: `1px solid ${RAYA}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            fontSize: '0.62rem',
-            color: SUAVE,
-          }}
-        >
-          {qrs.length > 0 ? (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {qrs.slice(0, 2).map((im) => (
-                <div
-                  key={im.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '7px',
-                    border: `1.3px solid ${acento}`,
-                    borderRadius: '3px',
-                    padding: '4px 7px',
-                  }}
-                >
-                  <span
-                    style={{ width: '30px', height: '30px', display: 'block' }}
-                    dangerouslySetInnerHTML={{ __html: im.qr! }}
+            <span style={{ fontSize: mm(2.7), color: SUAVE }}>{pie}</span>
+            {qrs.length ? (
+              <span style={{ display: 'flex', gap: mm(2), flexShrink: 0 }}>
+                {qrs.slice(0, 2).map((im) => (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    key={im.id}
+                    src={im.qr!}
+                    alt=""
+                    style={{ width: mm(11), height: mm(11), display: 'block' }}
                   />
-                  <span
-                    style={{
-                      fontSize: '0.54rem',
-                      lineHeight: 1.2,
-                      color: acento,
-                      maxWidth: '72px',
-                    }}
-                  >
-                    Apunta aquí y verás el vídeo
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <span>{pie}</span>
-          )}
-          <span>
-            {semana ? `${t.semanas} · ${semana}/52` : t.fotos(imagenes.length)}
-          </span>
-        </footer>
-      </div>
-    </article>
+                ))}
+              </span>
+            ) : null}
+          </footer>
+        </div>
+      </article>
+    </div>
   )
 }

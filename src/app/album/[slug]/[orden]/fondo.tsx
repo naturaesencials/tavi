@@ -173,10 +173,16 @@ export default function Fondo({
   clave,
   tipo,
   texto,
+  color,
+  opacidad = 0.2,
 }: {
   clave: string
   tipo: string
   texto: string | null
+  /** Color del tramo. El fondo se tiñe con él en vez de ir siempre gris. */
+  color?: string
+  /** Fracción de tinta. 0,2 es lo acordado para papel. */
+  opacidad?: number
 }) {
   const base = TEMAS[tipo] ?? TEMAS.semana
   const porTexto = texto
@@ -217,12 +223,12 @@ export default function Fondo({
           <g
             key={nombre}
             transform={`translate(${sitio.x} ${sitio.y}) rotate(${giro}) scale(${escala})`}
-            opacity="0.9"
+            opacity={opacidad}
           >
             <path
               d={dib.d}
               fill="none"
-              stroke={TRAZO}
+              stroke={color ?? TRAZO}
               strokeWidth="1.25"
               strokeLinecap="round"
               strokeLinejoin="round"

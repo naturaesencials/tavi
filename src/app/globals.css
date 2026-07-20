@@ -50,3 +50,42 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Impresión: la hoja pasa a medir milímetros de verdad y desaparece todo lo
+   que no es la página. Lo que se ve en pantalla es lo que sale del papel. */
+@page {
+  size: 210mm 297mm;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff;
+    margin: 0;
+    padding: 0;
+  }
+
+  .hoja-envoltura {
+    max-width: none !important;
+    margin: 0 !important;
+    container-type: normal !important;
+  }
+
+  .hoja {
+    --mm: 1mm !important;
+    box-shadow: none !important;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .hoja:last-of-type {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  header nav,
+  .no-imprimir {
+    display: none !important;
+  }
+}
