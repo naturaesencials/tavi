@@ -291,3 +291,57 @@ export function maquetar(
     usadas = usadas.slice(0, -1)
   }
 }
+
+/** Caracteres que caben en un milímetro de línea, al cuerpo del álbum. */
+const CAR_POR_MM = 1 / (4.4 * 0.5)
+const ALTO_LINEA = 4.4 * 1.55
+
+export type Flotante = {
+  ancho: number
+  alto: number
+  /** Líneas de texto que caben al costado de la foto. */
+  lineasAlLado: number
+  altoTotal: number
+}
+
+/** Coloca una foto flotando y el texto envolviéndola: el texto arranca al
+ *  costado de la foto y sigue a todo lo ancho por debajo.
+ *
+ *  La foto crece hasta el máximo que permita seguir cabiendo la página. Es
+ *  al revés que apilar: al no tener que esperar a que la foto termine, el
+ *  texto libera alto y la foto puede ser mayor, no menor.
+ */
+export function encajarFlotante(
+  pieza: Pieza,
+  caracteres: number,
+  anchoDisponible: number,
+  altoDisponible: number
+): Flotante | null {
+  const prop = proporcion(pieza)
+  const maximo = Math.min(techoDeResolucion(pieza), anchoDisponible * 0.62)
+  if (maximo < 60) return null // Una foto pequeña flotando queda ridícula.
+
+  for (let ancho = maximo; ancho >= 55; ancho -= 2) {
+    const alto = ancho / prop
+    const anchoResto = anchoDisponible - ancho - CALLE
+    // Una columna estrecha al costado da renglones cojos y muchos guiones.
+    if (anchoResto < 55) continue
+
+    const lineasAlLado = Math.floor(alto / ALTO_LINEA)
+    const carAlLado = lineasAlLado * Math.floor(anchoResto * CAR_POR_MM)
+    const carDebajo = Math.max(0, caracteres - carAlLado)
+    const lineasDebajo = Math.ceil(carDebajo / Math.floor(anchoDisponible * CAR_POR_MM))
+    const altoTotal = alto + lineasDebajo * ALTO_LINEA
+
+    // Se recorre de mayor a menor: la primera que cabe es la mayor posible.
+    if (altoTotal <= altoDisponible) return { ancho, alto, lineasAlLado, altoTotal }
+  }
+  return null
+}
+
+/** ¿Merece la pena flotar? Hace falta texto suficiente para que la foto no
+ *  quede con un rabillo de palabras al lado y un hueco blanco debajo, que
+ *  sería peor que apilar. Por debajo de unas cuarenta palabras, se apila. */
+export function convieneFlotar(nFotos: number, caracteres: number): boolean {
+  return nFotos >= 1 && caracteres >= 250
+}

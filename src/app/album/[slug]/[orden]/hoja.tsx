@@ -1,7 +1,16 @@
 import { T, type Idioma } from '@/lib/idioma'
 import Fondo from './fondo'
 import Marco, { elegirMarco } from './marco'
-import { PAGINA, UTIL, CALLE, maquetar, type Pieza } from '@/lib/maqueta'
+import {
+  PAGINA,
+  UTIL,
+  CALLE,
+  maquetar,
+  techoDeResolucion,
+  encajarFlotante,
+  convieneFlotar,
+  type Pieza,
+} from '@/lib/maqueta'
 
 export type FotoHoja = {
   id: string
@@ -59,6 +68,69 @@ function altoDeTexto(parrafos: string[], ancho: number): number {
 }
 
 const mm = (n: number) => `calc(${n} * var(--mm))`
+
+/** Una foto con su marco y su pie, al tamaño exacto que le ha asignado el
+ *  motor. El hueco tiene ya la proporción de la foto, así que `contain` no
+ *  recorta nada: solo garantiza que jamás se recorte aunque los metadatos
+ *  de tamaño vinieran mal. */
+function Foto({
+  im,
+  ancho,
+  alto,
+  esPrincipal,
+  indice,
+  clave,
+}: {
+  im: FotoHoja
+  ancho: number
+  alto: number
+  esPrincipal: boolean
+  indice: number
+  clave: string
+}) {
+  const fuente = im.medio === 'video' ? im.posterUrl : im.url
+  return (
+    <>
+      <div style={{ width: mm(ancho), height: mm(alto) }}>
+        <Marco
+          id={im.id}
+          estilo={elegirMarco(im.id, im.categoria, esPrincipal, indice, clave)}
+        >
+          <div
+            data-foto
+            style={{ width: '100%', height: '100%', background: '#E6E9E2' }}
+          >
+            {fuente ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={fuente}
+                alt={im.titulo ?? ''}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  display: 'block',
+                }}
+              />
+            ) : null}
+          </div>
+        </Marco>
+      </div>
+      {im.titulo ? (
+        <figcaption
+          style={{
+            marginTop: mm(1.2),
+            fontSize: mm(2.6),
+            lineHeight: 1.3,
+            color: SUAVE,
+          }}
+        >
+          {im.titulo}
+        </figcaption>
+      ) : null}
+    </>
+  )
+}
 
 export default function Hoja({
   idioma,
@@ -127,6 +199,63 @@ export default function Hoja({
   }))
   const maqueta = maquetar(piezas, UTIL.ancho, altoFotos)
   const porId = new Map(imagenes.map((im) => [im.id, im]))
+
+  /* Si hay texto suficiente, la foto principal flota y el texto la rodea:
+     arranca a su costado y sigue a todo lo ancho por debajo. Las demás fotos
+     bajan a filas debajo. Da más juego que apilar y, al liberar alto, deja
+     que la foto principal sea mayor, no menor. */
+  const caracteres = (texto ?? '').length
+  const altoCuerpo = Math.max(
+    0,
+    UTIL.alto - ALTO_CABECERA - ALTO_PIE - altoNota - altoMedidas
+  )
+  /* La principal es la de mayor techo de resolución, no la primera: da igual
+     el orden de subida, manda cuál aguanta salir grande. */
+  const iPrincipal = piezas.reduce(
+    (mejor, p, i) =>
+      techoDeResolucion(p) > techoDeResolucion(piezas[mejor]) ? i : mejor,
+    0
+  )
+  const principal = piezas[iPrincipal]
+  const resto = piezas.filter((_, i) => i !== iPrincipal)
+
+  const candidata =
+    imagenes.length >= 1 && convieneFlotar(imagenes.length, caracteres)
+      ? encajarFlotante(principal, caracteres, UTIL.ancho, altoCuerpo)
+      : null
+
+  /* Flotar no siempre gana. Con poco texto, la columna del costado obliga a
+     dejar la foto a media página y sobra papel en blanco debajo; apilada
+     puede ir a todo el ancho. Se queda la que deje la foto más grande. */
+  const anchoApilada = Math.min(techoDeResolucion(principal), UTIL.ancho)
+  const flotante =
+    candidata && anchoApilada <= candidata.ancho * 1.35 ? candidata : null
+
+  // Lo que sobra de fotos y de alto, una vez colocada la que flota.
+  const maquetaResto = maquetar(
+    flotante ? resto : [],
+    UTIL.ancho,
+    flotante ? Math.max(0, altoCuerpo - flotante.altoTotal - CALLE) : 0
+  )
+
+  // Se alterna el lado para que el álbum tenga ritmo y no todas las páginas
+  // empiecen igual.
+  const flotaDerecha = semana !== null && semana % 2 === 1
+  const claveMarco = `${tipo}-${semana ?? titulo}`
+
+  const estiloParrafo: React.CSSProperties = {
+    margin: `0 0 ${mm(2.5)}`,
+    fontSize: mm(CUERPO),
+    lineHeight: INTERLINEA,
+    textAlign: 'justify',
+    hyphens: 'auto',
+  }
+  const estiloFila: React.CSSProperties = {
+    display: 'flex',
+    gap: mm(CALLE),
+    marginBottom: mm(CALLE),
+    justifyContent: 'center',
+  }
 
   /* Se intercala: una fila de fotos, un párrafo, otra fila, otro párrafo.
      Un ladrillo de texto de 300 palabras al pie es mucho para un niño. */
@@ -244,96 +373,80 @@ export default function Hoja({
           </header>
 
           <div style={{ flex: 1, minHeight: 0 }}>
-            {bloques.map((b, i) =>
-              b.tipo === 'fotos' ? (
-                <div
-                  key={`f${i}`}
-                  style={{
-                    display: 'flex',
-                    gap: mm(CALLE),
-                    marginBottom: mm(CALLE),
-                    justifyContent: 'center',
-                  }}
-                >
-                  {maqueta.filas[b.indice].fotos.map((enc, j) => {
-                    const im = porId.get(enc.id)
-                    if (!im) return null
-                    const fuente = im.medio === 'video' ? im.posterUrl : im.url
-                    return (
-                      <figure
-                        key={enc.id}
-                        style={{
-                          margin: 0,
-                          width: mm(enc.ancho),
-                          flexShrink: 0,
-                        }}
-                      >
-                        <div style={{ width: '100%', height: mm(enc.alto) }}>
-                          <Marco
-                            id={im.id}
-                            estilo={elegirMarco(
-                              im.id,
-                              im.categoria,
-                              b.indice === 0 && j === 0,
-                              j,
-                              `${tipo}-${semana ?? ''}`
-                            )}
-                          >
-                            <div
-                              data-foto
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                background: '#E6E9E2',
-                              }}
-                            >
-                              {fuente ? (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img
-                                  src={fuente}
-                                  alt={im.titulo ?? ''}
-                                  style={{
-                                    /* contain, nunca cover: la foto se ve
-                                       entera o no se ve. */
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'contain',
-                                    display: 'block',
-                                  }}
-                                />
-                              ) : null}
-                            </div>
-                          </Marco>
-                        </div>
-                        {im.titulo ? (
-                          <figcaption
-                            style={{
-                              marginTop: mm(1.2),
-                              fontSize: mm(2.6),
-                              lineHeight: 1.3,
-                              color: SUAVE,
-                            }}
-                          >
-                            {im.titulo}
-                          </figcaption>
-                        ) : null}
-                      </figure>
-                    )
-                  })}
+            {flotante ? (
+              <>
+                <div>
+                  <figure
+                    style={{
+                      margin: 0,
+                      float: flotaDerecha ? 'right' : 'left',
+                      [flotaDerecha ? 'marginLeft' : 'marginRight']: mm(CALLE),
+                      marginBottom: mm(CALLE),
+                    }}
+                  >
+                    <Foto
+                      im={imagenes[iPrincipal]}
+                      ancho={flotante.ancho}
+                      alto={flotante.alto}
+                      esPrincipal
+                      indice={0}
+                      clave={claveMarco}
+                    />
+                  </figure>
+                  {parrafos.map((t, i) => (
+                    <p key={`fl${i}`} style={estiloParrafo}>
+                      {t}
+                    </p>
+                  ))}
+                  <div style={{ clear: 'both' }} />
                 </div>
-              ) : (
-                <p
-                  key={`t${i}`}
-                  style={{
-                    margin: `0 0 ${mm(2.5)}`,
-                    fontSize: mm(CUERPO),
-                    lineHeight: INTERLINEA,
-                    textAlign: 'justify',
-                    hyphens: 'auto',
-                  }}
-                >
-                  {b.texto}
-                </p>
+                {maquetaResto.filas.map((fila, i) => (
+                  <div key={`r${i}`} style={estiloFila}>
+                    {fila.fotos.map((enc, j) => {
+                      const im = porId.get(enc.id)
+                      if (!im) return null
+                      return (
+                        <figure key={enc.id} style={{ margin: 0, flexShrink: 0 }}>
+                          <Foto
+                            im={im}
+                            ancho={enc.ancho}
+                            alto={enc.alto}
+                            esPrincipal={false}
+                            indice={j + 1}
+                            clave={claveMarco}
+                          />
+                        </figure>
+                      )
+                    })}
+                  </div>
+                ))}
+              </>
+            ) : (
+              bloques.map((b, i) =>
+                b.tipo === 'fotos' ? (
+                  <div key={`f${i}`} style={estiloFila}>
+                    {maqueta.filas[b.indice].fotos.map((enc, j) => {
+                      const im = porId.get(enc.id)
+                      if (!im) return null
+                      return (
+                        <figure key={enc.id} style={{ margin: 0, flexShrink: 0 }}>
+                          <Foto
+                            im={im}
+                            ancho={enc.ancho}
+                            alto={enc.alto}
+                            esPrincipal={b.indice === 0 && j === 0}
+                            indice={j}
+                            clave={claveMarco}
+                          />
+                        </figure>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p key={`t${i}`} style={estiloParrafo}>
+                    {b.texto}
+                  </p>
+                )
               )
             )}
 
