@@ -64,14 +64,14 @@ export type Pieza = {
 /** Proporción de una foto. Sin medidas conocidas se asume apaisada suave,
  *  que es lo que menos daño hace en una fila. */
 export function proporcion(p: Pieza): number {
-  if (!p.ancho || !p.alto || p.alto === 0) return 1.4
+  if (!p || !p.ancho || !p.alto || p.alto === 0) return 1.4
   return p.ancho / p.alto
 }
 
 /** Ancho máximo en milímetros al que se puede imprimir un archivo sin bajar
  *  de 300 ppp. Una foto de 1200 px no puede pasar de 101,6 mm. */
 export function techoDeResolucion(p: Pieza): number {
-  if (!p.ancho) return UTIL.ancho
+  if (!p || !p.ancho) return UTIL.ancho
   return (p.ancho / PPP) * 25.4
 }
 
@@ -83,7 +83,7 @@ export function techoDeResolucion(p: Pieza): number {
  *  buenas. Ahora la floja apura hasta 200 ppp y las demás conservan tamaño;
  *  la floja queda marcada para que se vea en el panel. */
 export function techoAbsoluto(p: Pieza): number {
-  if (!p.ancho) return UTIL.ancho
+  if (!p || !p.ancho) return UTIL.ancho
   return (p.ancho / PPP_MINIMO) * 25.4
 }
 
@@ -95,6 +95,7 @@ export function techoAbsoluto(p: Pieza): number {
  *  dentro de su techo, y la fila se centra dejando aire a los lados.
  */
 export function encajarFila(piezas: Pieza[], anchoDisponible: number): Fila {
+  if (piezas.length === 0) return { fotos: [], alto: 0, sangriaLateral: 0 }
   const props = piezas.map(proporcion)
   const sumaProps = props.reduce((t, r) => t + r, 0)
   const calles = CALLE * (piezas.length - 1)
@@ -312,11 +313,12 @@ export type Flotante = {
  *  texto libera alto y la foto puede ser mayor, no menor.
  */
 export function encajarFlotante(
-  pieza: Pieza,
+  pieza: Pieza | null | undefined,
   caracteres: number,
   anchoDisponible: number,
   altoDisponible: number
 ): Flotante | null {
+  if (!pieza) return null
   const prop = proporcion(pieza)
   const maximo = Math.min(techoDeResolucion(pieza), anchoDisponible * 0.62)
   if (maximo < 60) return null // Una foto pequeña flotando queda ridícula.

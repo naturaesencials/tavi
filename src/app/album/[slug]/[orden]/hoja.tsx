@@ -216,18 +216,22 @@ export default function Hoja({
       techoDeResolucion(p) > techoDeResolucion(piezas[mejor]) ? i : mejor,
     0
   )
-  const principal = piezas[iPrincipal]
+  // Ojo: la mayoría de las páginas todavía no tienen ni una foto. Aquí no
+  // puede darse por hecho que exista una principal.
+  const principal = piezas.length > 0 ? piezas[iPrincipal] : null
   const resto = piezas.filter((_, i) => i !== iPrincipal)
 
   const candidata =
-    imagenes.length >= 1 && convieneFlotar(imagenes.length, caracteres)
+    principal && convieneFlotar(piezas.length, caracteres)
       ? encajarFlotante(principal, caracteres, UTIL.ancho, altoCuerpo)
       : null
 
   /* Flotar no siempre gana. Con poco texto, la columna del costado obliga a
      dejar la foto a media página y sobra papel en blanco debajo; apilada
      puede ir a todo el ancho. Se queda la que deje la foto más grande. */
-  const anchoApilada = Math.min(techoDeResolucion(principal), UTIL.ancho)
+  const anchoApilada = principal
+    ? Math.min(techoDeResolucion(principal), UTIL.ancho)
+    : 0
   const flotante =
     candidata && anchoApilada <= candidata.ancho * 1.35 ? candidata : null
 
