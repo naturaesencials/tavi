@@ -212,7 +212,9 @@ export default async function PaginaAlbum({
         lugarPie={
           pagina.tipo === 'semana' && pagina.numero_semana
             ? `${t.semanas} ${pagina.numero_semana}`
-            : (album.subtitulo ?? '')
+            : // Fuera de las semanas no hay nada que añadir: el subtítulo del
+              // álbum ya va arriba y repetirlo lo duplicaba en la cabecera.
+              ''
         }
         texto={grupo.texto}
         notaTitulo={

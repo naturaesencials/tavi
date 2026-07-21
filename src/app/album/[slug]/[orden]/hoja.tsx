@@ -247,6 +247,12 @@ export default function Hoja({
   const flotaDerecha = semana !== null && semana % 2 === 1
   const claveMarco = `${tipo}-${semana ?? titulo}`
 
+  /* Subtítulo y lugar pueden traer el mismo dato: en las páginas sin fecha
+     propia ambos caen al subtítulo del álbum. Sin esto salía repetido. */
+  const linea = Array.from(
+    new Set([subtitulo, lugarPie].map((v) => v?.trim()).filter(Boolean))
+  ).join(' · ')
+
   const estiloParrafo: React.CSSProperties = {
     margin: `0 0 ${mm(2.5)}`,
     fontSize: mm(CUERPO),
@@ -371,8 +377,7 @@ export default function Hoja({
               />
             </svg>
             <p style={{ margin: mm(1) + ' 0 0', fontSize: mm(3.3), color: SUAVE }}>
-              {subtitulo}
-              {lugarPie ? ` · ${lugarPie}` : ''}
+              {linea}
             </p>
           </header>
 
