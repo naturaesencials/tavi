@@ -5,7 +5,9 @@ import { fechaLarga, fechaLargaEn, rango, rangoEn } from '@/lib/fechas'
 import { elige, leerIdioma, T } from '@/lib/idioma'
 import type { Album, Foto, Pagina } from '@/lib/tipos'
 import QRCode from 'qrcode'
-import Hoja, { type FotoHoja } from './hoja'
+import { type FotoHoja } from './hoja'
+import HojaFotos from './hoja-fotos'
+import HojaTexto from './hoja-texto'
 
 export default async function PaginaAlbum({
   params,
@@ -63,7 +65,6 @@ export default async function PaginaAlbum({
 
   // Un A4 con texto no admite más de tres fotos si han de verse bien. Lo que
   // pase de ahí continúa en otra hoja de la misma página.
-  const POR_HOJA = 3
 
   const imagenes: FotoHoja[] = await Promise.all(
     (fotos ?? []).map(async (f) => {
@@ -143,23 +144,44 @@ export default async function PaginaAlbum({
           : fechaLarga(pagina.fecha_inicio)
         : (elige(album.subtitulo, album.subtitulo_en, idioma) ?? '')
 
-  // Se reparte el texto entre las hojas en proporción a las fotos de cada
-  // una, para que ninguna quede con la plancha entera y otra en blanco.
-  const parrafosPagina = (
-    elige(pagina.texto_cuento, pagina.texto_cuento_en, idioma) ?? ''
-  )
-    .split('\n\n')
-    .filter(Boolean)
+  const cuento = elige(pagina.texto_cuento, pagina.texto_cuento_en, idioma) ?? ''
 
-  const nHojas = Math.max(1, Math.ceil(imagenes.length / POR_HOJA))
-  const grupos = Array.from({ length: nHojas }, (_, i) => {
-    const desde = Math.ceil((parrafosPagina.length * i) / nHojas)
-    const hasta = Math.ceil((parrafosPagina.length * (i + 1)) / nHojas)
-    return {
-      fotos: imagenes.slice(i * POR_HOJA, (i + 1) * POR_HOJA),
-      texto: parrafosPagina.slice(desde, hasta).join('\n\n') || null,
-    }
-  })
+  /* El álbum es un scrapbook: cada página se parte en dos hojas. La de fotos
+     lleva las copias giradas y un apunte breve; la del cuento lleva el texto
+     largo, que en un scrapbook no cabría entre las fotos. Las páginas sin
+     fotos siguen siendo una sola hoja. */
+  const POR_HOJA_FOTOS = 6
+  const hojasDeFotos = Math.ceil(imagenes.length / POR_HOJA_FOTOS)
+
+  // El apunte manuscrito de la hoja de fotos: la primera frase del cuento.
+  const apunte =
+    cuento.trim().split(/(?<=[.!?])\s+/)[0]?.slice(0, 160) || null
+
+  const medidas =
+    pagina.tipo === 'semana'
+      ? `${t.peso}: ${pagina.peso_g === null ? '—' : `${(pagina.peso_g / 1000).toLocaleString('es-ES')} kg`} · ` +
+        `${t.talla}: ${pagina.talla_mm === null ? '—' : `${(pagina.talla_mm / 10).toLocaleString('es-ES')} cm`} · ` +
+        `${t.cabeza}: ${pagina.cabeza_mm === null ? '—' : `${(pagina.cabeza_mm / 10).toLocaleString('es-ES')} cm`}`
+      : null
+
+  const sello: [string, string] | null = pagina.fecha_inicio
+    ? [
+        new Date(pagina.fecha_inicio)
+          .toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+          .replace('.', '')
+          .toUpperCase(),
+        String(new Date(pagina.fecha_inicio).getFullYear()),
+      ]
+    : null
+
+  const tituloPagina =
+    elige(pagina.titulo, pagina.titulo_en, idioma) ??
+    elige(album.titulo, album.titulo_en, idioma) ??
+    ''
+
+  // El pliego decide el color del papel: las hojas de una misma página lo
+  // comparten, y la página siguiente estrena color.
+  const pliego = orden
 
   return (
     <main className="mx-auto min-h-dvh max-w-5xl px-4 py-10">
@@ -196,49 +218,33 @@ export default async function PaginaAlbum({
         </div>
       </nav>
 
-      {grupos.map((grupo, i) => (
-      <Hoja
-        key={i}
-        encabezado={encabezado}
-        idioma={idioma}
-        tipo={pagina.tipo}
-        esSemana={pagina.tipo === 'semana' && i === grupos.length - 1}
-        titulo={
-          (elige(pagina.titulo, pagina.titulo_en, idioma) ??
-            elige(album.titulo, album.titulo_en, idioma) ??
-            '') + (i > 0 ? (idioma === 'en' ? ' (continues)' : ' (sigue)') : '')
-        }
-        subtitulo={subtitulo}
-        lugarPie={
-          pagina.tipo === 'semana' && pagina.numero_semana
-            ? `${t.semanas} ${pagina.numero_semana}`
-            : // Fuera de las semanas no hay nada que añadir: el subtítulo del
-              // álbum ya va arriba y repetirlo lo duplicaba en la cabecera.
-              ''
-        }
-        texto={grupo.texto}
-        notaTitulo={
-          i === grupos.length - 1
-            ? elige(
-                pagina.nota_mundo_titulo,
-                pagina.nota_mundo_titulo_en,
-                idioma
-              )
-            : null
-        }
-        nota={
-          i === grupos.length - 1
-            ? elige(pagina.nota_mundo, pagina.nota_mundo_en, idioma)
-            : null
-        }
-        pesoG={pagina.peso_g}
-        tallaMm={pagina.talla_mm}
-        cabezaMm={pagina.cabeza_mm}
-        semana={pagina.numero_semana}
-        imagenes={grupo.fotos}
-        pie={elige(album.titulo, album.titulo_en, idioma) ?? ''}
-      />
+      {Array.from({ length: hojasDeFotos }, (_, i) => (
+        <HojaFotos
+          key={`f${i}`}
+          encabezado={encabezado}
+          titulo={
+            tituloPagina + (i > 0 ? (idioma === 'en' ? ' (continues)' : ' (sigue)') : '')
+          }
+          sello={i === 0 ? sello : null}
+          nota={i === 0 ? apunte : null}
+          imagenes={imagenes.slice(i * POR_HOJA_FOTOS, (i + 1) * POR_HOJA_FOTOS)}
+          numero={pagina.numero_semana}
+          pliego={pliego}
+        />
       ))}
+
+      <HojaTexto
+        encabezado={encabezado}
+        titulo={tituloPagina}
+        subtitulo={subtitulo}
+        texto={cuento || null}
+        notaTitulo={elige(pagina.nota_mundo_titulo, pagina.nota_mundo_titulo_en, idioma)}
+        nota={elige(pagina.nota_mundo, pagina.nota_mundo_en, idioma)}
+        medidas={medidas}
+        firma={idioma === 'en' ? 'dad' : 'papá'}
+        numero={pagina.numero_semana}
+        pliego={pliego}
+      />
 
       <p className="mt-6 text-center text-[0.8rem] text-pino/50">
         {t.aviso}

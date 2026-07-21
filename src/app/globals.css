@@ -59,6 +59,16 @@ body {
 }
 
 @media print {
+  /* Sin esto el navegador descarta fondos y sombras al imprimir, y un
+     scrapbook saldría en blanco: el papel estampado, las cintas y las
+     sombras de las fotos son el diseño, no decoración prescindible. */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   html,
   body {
     background: #fff;
