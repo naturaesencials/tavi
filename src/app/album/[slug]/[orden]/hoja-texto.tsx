@@ -1,12 +1,22 @@
 import { PAGINA } from '@/lib/maqueta'
 import { papelDePliego, adornosDe, type Papel } from '@/lib/escenografia'
 import { mm, Pagina, PapelRasgado, Dibujo } from './papeleria'
+import type { FotoHoja } from './hoja'
+
+/** Color del post-it: un tono cálido de nota adhesiva que contraste con el
+ *  papel del pliego, no una variación del mismo color. */
+function postit(papel: { acento: string }): { fondo: string; tinta: string } {
+  // Amarillo clásico de post-it; si el acento ya tira a cálido, rosa.
+  const calido = /^#[aAbBcCdD]/.test(papel.acento)
+  return calido
+    ? { fondo: '#F7C9D0', tinta: '#5A2E38' }
+    : { fondo: '#FCE9A6', tinta: '#5A4A22' }
+}
 
 /* Cuerpo del cuento en milímetros de papel: 4,6 mm son unos 13 pt. Un niño
    de cinco años puede seguirlo con el dedo. */
 const CUERPO = 4.6
 const INTERLINEA = 1.62
-const LINEA = CUERPO * INTERLINEA
 const MARGEN_IZQ = 26
 const MARGEN_DER = 18
 const ANCHO_TEXTO = PAGINA.ancho - MARGEN_IZQ - MARGEN_DER
@@ -20,6 +30,7 @@ export default function HojaTexto({
   nota,
   medidas,
   firma,
+  fotos,
   numero,
   pliego,
   sangrado = false,
@@ -33,6 +44,8 @@ export default function HojaTexto({
   /** Peso, talla y perímetro de la semana, ya formateados. */
   medidas: string | null
   firma: string | null
+  /** Fotos sobrantes de la hoja de fotos, colocadas aquí como recortes. */
+  fotos?: FotoHoja[]
   numero: number | null
   pliego: number
   sangrado?: boolean
@@ -40,15 +53,16 @@ export default function HojaTexto({
   const papel: Papel = papelDePliego(pliego)
   const parrafos = (texto ?? '').split('\n\n').filter(Boolean)
   const [, adorno] = adornosDe(pliego)
+  const hayFotosMargen = !!fotos && fotos.length > 0
+  // Si hay recortes al margen derecho, el texto se estrecha para no quedar
+  // por debajo de ellos.
+  const anchoTexto = hayFotosMargen ? ANCHO_TEXTO - 60 : ANCHO_TEXTO
 
   // La capitular se saca de la primera letra y el resto del párrafo fluye a
   // su alrededor.
   const primero = parrafos[0] ?? ''
   const capitular = primero.charAt(0)
   const restoPrimero = primero.slice(1)
-
-  // Renglón a lápiz. Se dibuja de fondo, como en un cuaderno.
-  const renglones = Math.floor((PAGINA.alto - 120) / LINEA)
 
   return (
     <Pagina papel={papel} clave={`t${pliego}`} sangrado={sangrado} numero={numero}>
@@ -112,32 +126,12 @@ export default function HojaTexto({
         ) : null}
       </header>
 
-      {/* Renglón a lápiz de fondo. */}
-      <svg
-        aria-hidden
-        viewBox={`0 0 ${PAGINA.ancho} ${PAGINA.alto}`}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-      >
-        {Array.from({ length: renglones }, (_, i) => {
-          const y = 62 + i * LINEA
-          return (
-            <path
-              key={i}
-              d={`M${MARGEN_IZQ} ${y} H${PAGINA.ancho - MARGEN_DER}`}
-              stroke={papel.trama}
-              strokeWidth="0.25"
-              opacity="0.7"
-            />
-          )
-        })}
-      </svg>
-
       <div
         style={{
           position: 'absolute',
           left: mm(MARGEN_IZQ),
           top: mm(58),
-          width: mm(ANCHO_TEXTO),
+          width: mm(anchoTexto),
         }}
       >
         {primero ? (
@@ -183,21 +177,39 @@ export default function HojaTexto({
         ))}
 
         {nota ? (
-          <aside
+          <div
             style={{
-              marginTop: mm(6),
-              borderLeft: `${mm(1.2)} solid ${papel.acento}`,
-              paddingLeft: mm(5),
+              marginTop: mm(8),
+              marginLeft: mm(4),
+              width: mm(ANCHO_TEXTO - 14),
+              transform: 'rotate(-1.4deg)',
+              background: postit(papel).fondo,
+              boxShadow: `${mm(0.6)} ${mm(1.4)} ${mm(2.4)} rgba(60,50,35,0.22)`,
+              padding: `${mm(6)} ${mm(6)} ${mm(7)}`,
+              boxSizing: 'border-box',
             }}
           >
+            {/* La tira de cinta que lo pega por arriba. */}
+            <div
+              style={{
+                position: 'absolute',
+                top: mm(-3),
+                left: '50%',
+                width: mm(24),
+                height: mm(6),
+                transform: 'translateX(-50%) rotate(-3deg)',
+                background: papel.acento,
+                opacity: 0.5,
+              }}
+            />
             {notaTitulo ? (
               <h2
                 style={{
                   margin: 0,
-                  fontSize: mm(3.8),
+                  fontSize: mm(3.9),
                   fontWeight: 500,
                   fontStyle: 'italic',
-                  color: papel.acento,
+                  color: postit(papel).tinta,
                 }}
               >
                 {notaTitulo}
@@ -205,14 +217,15 @@ export default function HojaTexto({
             ) : null}
             <p
               style={{
-                margin: `${mm(1.2)} 0 0`,
-                fontSize: mm(3.7),
+                margin: `${mm(1.4)} 0 0`,
+                fontSize: mm(3.8),
                 lineHeight: 1.5,
+                color: postit(papel).tinta,
               }}
             >
               {nota}
             </p>
-          </aside>
+          </div>
         ) : null}
 
         {medidas ? (
@@ -221,6 +234,58 @@ export default function HojaTexto({
           </p>
         ) : null}
       </div>
+
+      {/* Fotos traídas de la hoja de fotos, como recortes pegados al margen
+          derecho. Solo aparecen cuando el cuento es corto y sobran una o dos
+          copias, para no dejar una hoja de fotos casi vacía. */}
+      {fotos && fotos.length > 0
+        ? fotos.slice(0, 2).map((im, i) => {
+            const fuente = im.medio === 'video' ? im.posterUrl : im.url
+            const prop =
+              im.ancho && im.alto ? im.ancho / im.alto : 1.35
+            const anchoFoto = 52
+            const altoFoto = anchoFoto / prop
+            return (
+              <div
+                key={im.id}
+                style={{
+                  position: 'absolute',
+                  right: mm(16),
+                  top: mm(90 + i * (altoFoto + 22)),
+                  width: mm(anchoFoto + 8),
+                  transform: `rotate(${i % 2 === 0 ? 3.5 : -3}deg)`,
+                  background: '#FFFDF8',
+                  boxShadow: `${mm(0.8)} ${mm(1.2)} ${mm(2.4)} rgba(60,50,35,0.26)`,
+                  padding: `${mm(4)} ${mm(4)} ${mm(9)}`,
+                  boxSizing: 'border-box',
+                }}
+              >
+                <div
+                  style={{
+                    width: mm(anchoFoto),
+                    height: mm(altoFoto),
+                    background: '#E6E9E2',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {fuente ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={fuente}
+                      alt={im.titulo ?? ''}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            )
+          })
+        : null}
 
       {firma ? (
         <div

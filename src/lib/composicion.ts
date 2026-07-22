@@ -285,12 +285,16 @@ export function componer(
 
 /** Cupo de fotos por hoja según su forma predominante.
  *
- *  Regla del usuario: cuadradas hasta cinco; verticales u horizontales,
- *  cuatro como mucho, para que no tengan que solaparse tanto y sigan
- *  leyéndose. */
-function cupoPorForma(piezas: Pieza[]): number {
+ *  Regla del usuario: cuadradas hasta cinco; horizontales cuatro; y las
+ *  verticales, tres como mucho, porque son las que más sitio piden a lo alto
+ *  y al meter más se pisan tanto que dejan de leerse. */
+export function cupoPorForma(piezas: Pieza[]): number {
   const props = piezas.map(proporcion)
+  const n = piezas.length
   const cuadradas = props.filter((r) => r >= 0.85 && r <= 1.18).length
-  const mayoriaCuadrada = cuadradas >= Math.ceil(piezas.length / 2)
-  return mayoriaCuadrada ? 5 : 4
+  const verticales = props.filter((r) => r < 0.85).length
+
+  if (cuadradas >= Math.ceil(n / 2)) return 5
+  if (verticales >= Math.ceil(n / 2)) return 3
+  return 4
 }

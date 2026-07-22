@@ -6,6 +6,7 @@ import { elige, leerIdioma, T } from '@/lib/idioma'
 import type { Album, Foto, Pagina } from '@/lib/tipos'
 import QRCode from 'qrcode'
 import { type FotoHoja } from './hoja'
+import { cupoPorForma as cupoDeHoja } from '@/lib/composicion'
 import HojaFotos from './hoja-fotos'
 import HojaTexto from './hoja-texto'
 
@@ -150,8 +151,35 @@ export default async function PaginaAlbum({
      lleva las copias giradas y un apunte breve; la del cuento lleva el texto
      largo, que en un scrapbook no cabría entre las fotos. Las páginas sin
      fotos siguen siendo una sola hoja. */
-  const POR_HOJA_FOTOS = 6
-  const hojasDeFotos = Math.ceil(imagenes.length / POR_HOJA_FOTOS)
+  /* Cuántas fotos entran en una hoja lo decide el motor según su forma:
+     3 verticales, 4 horizontales, 5 cuadradas. Se agrupan respetando ese
+     cupo en vez de un número fijo. */
+  const gruposFotos: FotoHoja[][] = []
+  {
+    let resto = [...imagenes]
+    while (resto.length > 0) {
+      const cupo = cupoDeHoja(
+        resto.map((im) => ({ id: im.id, ancho: im.ancho, alto: im.alto }))
+      )
+      gruposFotos.push(resto.slice(0, cupo))
+      resto = resto.slice(cupo)
+    }
+  }
+
+  /* Si sobra una hoja de fotos con muy pocas (una o dos) y el cuento es
+     corto, esas fotos se llevan a la hoja de texto como recortes al margen,
+     en vez de dejar una hoja casi vacía. Es lo que pediste: combinar las
+     fotos que faltan en la página del texto cuando hay hueco. */
+  let fotosEnTexto: FotoHoja[] = []
+  if (
+    gruposFotos.length >= 2 &&
+    gruposFotos[gruposFotos.length - 1].length <= 2 &&
+    cuento.length < 900
+  ) {
+    fotosEnTexto = gruposFotos.pop() ?? []
+  }
+
+  const hojasDeFotos = gruposFotos.length
 
   // El apunte manuscrito de la hoja de fotos: la primera frase del cuento.
   const apunte =
@@ -227,7 +255,7 @@ export default async function PaginaAlbum({
           }
           sello={i === 0 ? sello : null}
           nota={i === 0 ? apunte : null}
-          imagenes={imagenes.slice(i * POR_HOJA_FOTOS, (i + 1) * POR_HOJA_FOTOS)}
+          imagenes={gruposFotos[i]}
           numero={pagina.numero_semana}
           pliego={pliego}
         />
@@ -242,6 +270,7 @@ export default async function PaginaAlbum({
         nota={elige(pagina.nota_mundo, pagina.nota_mundo_en, idioma)}
         medidas={medidas}
         firma={idioma === 'en' ? 'dad' : 'papá'}
+        fotos={fotosEnTexto}
         numero={pagina.numero_semana}
         pliego={pliego}
       />

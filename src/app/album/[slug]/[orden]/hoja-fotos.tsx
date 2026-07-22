@@ -76,9 +76,13 @@ export default function HojaFotos({
           style={{
             margin: 0,
             fontSize: mm(3),
-            letterSpacing: mm(0.5),
+            letterSpacing: mm(0.4),
             textTransform: 'uppercase',
             color: papel.suave,
+            maxWidth: mm(util.ancho - 44),
+            lineHeight: 1.25,
+            wordBreak: 'normal',
+            overflowWrap: 'break-word',
           }}
         >
           {encabezado}
