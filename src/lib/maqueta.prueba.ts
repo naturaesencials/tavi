@@ -131,8 +131,8 @@ console.log('\nScrapbook: nada tapa la cabecera ni se sale')
 
   const seis = Array.from({ length: 6 }, (_, i) => foto(`x${i}`, 1066, 1600))
   const cv = componer(seis, W, H, 3)
-  comprobar('verticales: máximo 4 por hoja', cv.fotos.length <= 4)
-  comprobar('verticales: las demás se apartan', cv.desbordadas.length === 2)
+  comprobar('verticales: máximo 3 por hoja', cv.fotos.length <= 3)
+  comprobar('verticales: las demás se apartan', cv.desbordadas.length === 3)
 
   const seisc = Array.from({ length: 6 }, (_, i) => foto(`y${i}`, 1000, 1000))
   const cc = componer(seisc, W, H, 3)
