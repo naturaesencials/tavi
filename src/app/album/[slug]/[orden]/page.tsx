@@ -155,18 +155,11 @@ export default async function PaginaAlbum({
      3 verticales, 4 horizontales, 5 cuadradas. Se agrupan respetando ese
      cupo en vez de un número fijo. */
 
-  // Antes del reparto por forma, se apartan las fotos que por su tema van
-  // mejor en la hoja de texto: los retratos de la donante conviven mal con
-  // las ecografías, que además se quieren ver juntas.
-  const vanAlTextoPorTema = imagenes.filter((im) => im.categoria === 'jessica')
-  const paraHojaFotos =
-    vanAlTextoPorTema.length > 0 && vanAlTextoPorTema.length < imagenes.length
-      ? imagenes.filter((im) => im.categoria !== 'jessica')
-      : imagenes
-
+  /* Cuántas fotos entran en una hoja lo decide el motor según su forma:
+     3 verticales, 4 horizontales, 5 cuadradas. */
   const gruposFotos: FotoHoja[][] = []
   {
-    let resto = [...paraHojaFotos]
+    let resto = [...imagenes]
     while (resto.length > 0) {
       const cupo = cupoDeHoja(
         resto.map((im) => ({ id: im.id, ancho: im.ancho, alto: im.alto }))
@@ -176,37 +169,30 @@ export default async function PaginaAlbum({
     }
   }
 
-  /* Si sobra una hoja de fotos con muy pocas (una o dos) y el cuento es
-     corto, esas fotos se llevan a la hoja de texto como recortes al margen,
-     en vez de dejar una hoja casi vacía. Es lo que pediste: combinar las
-     fotos que faltan en la página del texto cuando hay hueco. */
+  /* Reparto a la hoja de texto. Reglas, en orden:
+     - Una sola foto en toda la página: se queda en la hoja de fotos. Nunca
+       baja al texto (era lo que la duplicaba).
+     - Varias fotos y cuento corto: las que no caben con holgura en la hoja
+       de fotos bajan al texto, y se QUITAN de la hoja de fotos para no
+       repetirse.
+     Las que bajan se colocan luego centradas en el hueco bajo el texto. */
   let fotosEnTexto: FotoHoja[] = []
-  const ultimo = gruposFotos[gruposFotos.length - 1] ?? []
-  const todasVerticales =
-    ultimo.length > 0 &&
-    ultimo.every((im) => im.ancho && im.alto && im.ancho / im.alto < 0.85)
 
-  if (
-    gruposFotos.length >= 2 &&
-    ultimo.length <= 3 &&
-    cuento.length < 900
-  ) {
-    // El último grupo baja entero a la hoja de texto.
-    fotosEnTexto = gruposFotos.pop() ?? []
-  } else if (
-    gruposFotos.length === 1 &&
-    ultimo.length === 3 &&
-    todasVerticales &&
-    cuento.length < 900
-  ) {
-    // Tres verticales largas en una sola hoja se pisan: una baja al texto y
-    // quedan dos, que respiran. Es el caso de "Seguías creciendo".
-    fotosEnTexto = [ultimo[ultimo.length - 1]]
-    gruposFotos[0] = ultimo.slice(0, 2)
+  if (imagenes.length >= 3 && cuento.length < 900) {
+    const ultimo = gruposFotos[gruposFotos.length - 1] ?? []
+    const verticales = ultimo.every(
+      (im) => im.ancho && im.alto && im.ancho / im.alto < 0.85
+    )
+
+    if (gruposFotos.length >= 2 && ultimo.length <= 3) {
+      // El último grupo baja entero y desaparece de la hoja de fotos.
+      fotosEnTexto = gruposFotos.pop() ?? []
+    } else if (gruposFotos.length === 1 && ultimo.length === 3 && verticales) {
+      // Tres verticales largas en una sola hoja se pisan: una baja al texto.
+      fotosEnTexto = [ultimo[ultimo.length - 1]]
+      gruposFotos[0] = ultimo.slice(0, 2)
+    }
   }
-
-  // Las apartadas por tema se suman a lo que baje al texto.
-  fotosEnTexto = [...vanAlTextoPorTema, ...fotosEnTexto]
 
   const hojasDeFotos = gruposFotos.length
 

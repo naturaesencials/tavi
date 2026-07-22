@@ -232,32 +232,48 @@ export default function HojaTexto({
         ) : null}
       </div>
 
-      {/* Fotos traídas de la hoja de fotos: van en una fila debajo del
-          texto, con marco de copia y un ligero giro. Debajo y no al margen,
-          que es donde se salían. */}
+      {/* Fotos traídas de la hoja de fotos: se centran en el hueco entre el
+          final del texto y el pie de la hoja, ocupándolo de verdad, no
+          pegadas al fondo. */}
       {fotos && fotos.length > 0
         ? (() => {
             const n = Math.min(fotos.length, 3)
-            const calle = 6
+            const calle = 7
             const anchoFila = PAGINA.ancho - MARGEN_IZQ - MARGEN_DER
-            // Reparto justificado: todas comparten alto, el ancho sale de su
-            // proporción. Nunca se recorta ni se sale.
+
+            // Alto aproximado del texto, para saber dónde empieza el hueco.
+            const carPorLinea = Math.floor(anchoTexto / (CUERPO * 0.5))
+            const lineas = parrafos.reduce(
+              (t, p) => t + Math.max(1, Math.ceil(p.length / carPorLinea)),
+              0
+            )
+            const finTexto = 64 + lineas * (CUERPO * INTERLINEA) + 14
+            // El hueco va desde ahí hasta la banda del pie (firma + número).
+            const finHueco = PAGINA.alto - 34
+            const altoHueco = Math.max(40, finHueco - finTexto)
+
+            // Las fotos ocupan el hueco: alto justificado, con un techo
+            // generoso para que se vean grandes, y centradas en él.
             const props = fotos.slice(0, n).map((im) =>
               im.ancho && im.alto ? im.ancho / im.alto : 1.35
             )
             const sumaProps = props.reduce((t, r) => t + r, 0)
             let alto = (anchoFila - calle * (n - 1)) / sumaProps
-            alto = Math.min(alto, 62) // techo para que no coman toda la hoja
+            alto = Math.min(alto, altoHueco - 14, 96)
+            const anchoUsado =
+              alto * sumaProps + calle * (n - 1)
+            const centroHueco = finTexto + altoHueco / 2
+
             return (
               <div
                 style={{
                   position: 'absolute',
-                  left: mm(MARGEN_IZQ),
-                  bottom: mm(30),
-                  width: mm(anchoFila),
+                  left: mm(MARGEN_IZQ + (anchoFila - anchoUsado) / 2),
+                  top: mm(centroHueco - alto / 2),
+                  width: mm(anchoUsado),
                   display: 'flex',
                   gap: mm(calle),
-                  alignItems: 'flex-end',
+                  alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
@@ -271,8 +287,8 @@ export default function HojaTexto({
                         width: mm(anchoFoto + 8),
                         transform: `rotate(${i % 2 === 0 ? -2.5 : 2.5}deg)`,
                         background: '#FFFDF8',
-                        boxShadow: `${mm(0.8)} ${mm(1.2)} ${mm(2.4)} rgba(60,50,35,0.26)`,
-                        padding: `${mm(4)} ${mm(4)} ${mm(8)}`,
+                        boxShadow: `${mm(0.8)} ${mm(1.2)} ${mm(2.6)} rgba(60,50,35,0.26)`,
+                        padding: `${mm(4)} ${mm(4)} ${mm(9)}`,
                         boxSizing: 'border-box',
                         flexShrink: 0,
                       }}
