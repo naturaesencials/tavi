@@ -53,10 +53,7 @@ export default function HojaTexto({
   const papel: Papel = papelDePliego(pliego)
   const parrafos = (texto ?? '').split('\n\n').filter(Boolean)
   const [, adorno] = adornosDe(pliego)
-  const hayFotosMargen = !!fotos && fotos.length > 0
-  // Si hay recortes al margen derecho, el texto se estrecha para no quedar
-  // por debajo de ellos.
-  const anchoTexto = hayFotosMargen ? ANCHO_TEXTO - 60 : ANCHO_TEXTO
+  const anchoTexto = ANCHO_TEXTO
 
   // La capitular se saca de la primera letra y el resto del párrafo fluye a
   // su alrededor.
@@ -79,7 +76,7 @@ export default function HojaTexto({
         style={{
           position: 'absolute',
           left: mm(MARGEN_IZQ),
-          top: mm(20),
+          top: mm(26),
           width: mm(ANCHO_TEXTO),
         }}
       >
@@ -130,7 +127,7 @@ export default function HojaTexto({
         style={{
           position: 'absolute',
           left: mm(MARGEN_IZQ),
-          top: mm(58),
+          top: mm(64),
           width: mm(anchoTexto),
         }}
       >
@@ -235,56 +232,79 @@ export default function HojaTexto({
         ) : null}
       </div>
 
-      {/* Fotos traídas de la hoja de fotos, como recortes pegados al margen
-          derecho. Solo aparecen cuando el cuento es corto y sobran una o dos
-          copias, para no dejar una hoja de fotos casi vacía. */}
+      {/* Fotos traídas de la hoja de fotos: van en una fila debajo del
+          texto, con marco de copia y un ligero giro. Debajo y no al margen,
+          que es donde se salían. */}
       {fotos && fotos.length > 0
-        ? fotos.slice(0, 2).map((im, i) => {
-            const fuente = im.medio === 'video' ? im.posterUrl : im.url
-            const prop =
+        ? (() => {
+            const n = Math.min(fotos.length, 3)
+            const calle = 6
+            const anchoFila = PAGINA.ancho - MARGEN_IZQ - MARGEN_DER
+            // Reparto justificado: todas comparten alto, el ancho sale de su
+            // proporción. Nunca se recorta ni se sale.
+            const props = fotos.slice(0, n).map((im) =>
               im.ancho && im.alto ? im.ancho / im.alto : 1.35
-            const anchoFoto = 52
-            const altoFoto = anchoFoto / prop
+            )
+            const sumaProps = props.reduce((t, r) => t + r, 0)
+            let alto = (anchoFila - calle * (n - 1)) / sumaProps
+            alto = Math.min(alto, 62) // techo para que no coman toda la hoja
             return (
               <div
-                key={im.id}
                 style={{
                   position: 'absolute',
-                  right: mm(16),
-                  top: mm(90 + i * (altoFoto + 22)),
-                  width: mm(anchoFoto + 8),
-                  transform: `rotate(${i % 2 === 0 ? 3.5 : -3}deg)`,
-                  background: '#FFFDF8',
-                  boxShadow: `${mm(0.8)} ${mm(1.2)} ${mm(2.4)} rgba(60,50,35,0.26)`,
-                  padding: `${mm(4)} ${mm(4)} ${mm(9)}`,
-                  boxSizing: 'border-box',
+                  left: mm(MARGEN_IZQ),
+                  bottom: mm(30),
+                  width: mm(anchoFila),
+                  display: 'flex',
+                  gap: mm(calle),
+                  alignItems: 'flex-end',
+                  justifyContent: 'center',
                 }}
               >
-                <div
-                  style={{
-                    width: mm(anchoFoto),
-                    height: mm(altoFoto),
-                    background: '#E6E9E2',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {fuente ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={fuente}
-                      alt={im.titulo ?? ''}
+                {fotos.slice(0, n).map((im, i) => {
+                  const fuente = im.medio === 'video' ? im.posterUrl : im.url
+                  const anchoFoto = alto * props[i]
+                  return (
+                    <div
+                      key={im.id}
                       style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                        display: 'block',
+                        width: mm(anchoFoto + 8),
+                        transform: `rotate(${i % 2 === 0 ? -2.5 : 2.5}deg)`,
+                        background: '#FFFDF8',
+                        boxShadow: `${mm(0.8)} ${mm(1.2)} ${mm(2.4)} rgba(60,50,35,0.26)`,
+                        padding: `${mm(4)} ${mm(4)} ${mm(8)}`,
+                        boxSizing: 'border-box',
+                        flexShrink: 0,
                       }}
-                    />
-                  ) : null}
-                </div>
+                    >
+                      <div
+                        style={{
+                          width: mm(anchoFoto),
+                          height: mm(alto),
+                          background: '#E6E9E2',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {fuente ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={fuente}
+                            alt={im.titulo ?? ''}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              display: 'block',
+                            }}
+                          />
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )
-          })
+          })()
         : null}
 
       {firma ? (

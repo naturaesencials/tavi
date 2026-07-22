@@ -154,9 +154,19 @@ export default async function PaginaAlbum({
   /* Cuántas fotos entran en una hoja lo decide el motor según su forma:
      3 verticales, 4 horizontales, 5 cuadradas. Se agrupan respetando ese
      cupo en vez de un número fijo. */
+
+  // Antes del reparto por forma, se apartan las fotos que por su tema van
+  // mejor en la hoja de texto: los retratos de la donante conviven mal con
+  // las ecografías, que además se quieren ver juntas.
+  const vanAlTextoPorTema = imagenes.filter((im) => im.categoria === 'jessica')
+  const paraHojaFotos =
+    vanAlTextoPorTema.length > 0 && vanAlTextoPorTema.length < imagenes.length
+      ? imagenes.filter((im) => im.categoria !== 'jessica')
+      : imagenes
+
   const gruposFotos: FotoHoja[][] = []
   {
-    let resto = [...imagenes]
+    let resto = [...paraHojaFotos]
     while (resto.length > 0) {
       const cupo = cupoDeHoja(
         resto.map((im) => ({ id: im.id, ancho: im.ancho, alto: im.alto }))
@@ -171,13 +181,32 @@ export default async function PaginaAlbum({
      en vez de dejar una hoja casi vacía. Es lo que pediste: combinar las
      fotos que faltan en la página del texto cuando hay hueco. */
   let fotosEnTexto: FotoHoja[] = []
+  const ultimo = gruposFotos[gruposFotos.length - 1] ?? []
+  const todasVerticales =
+    ultimo.length > 0 &&
+    ultimo.every((im) => im.ancho && im.alto && im.ancho / im.alto < 0.85)
+
   if (
     gruposFotos.length >= 2 &&
-    gruposFotos[gruposFotos.length - 1].length <= 2 &&
+    ultimo.length <= 3 &&
     cuento.length < 900
   ) {
+    // El último grupo baja entero a la hoja de texto.
     fotosEnTexto = gruposFotos.pop() ?? []
+  } else if (
+    gruposFotos.length === 1 &&
+    ultimo.length === 3 &&
+    todasVerticales &&
+    cuento.length < 900
+  ) {
+    // Tres verticales largas en una sola hoja se pisan: una baja al texto y
+    // quedan dos, que respiran. Es el caso de "Seguías creciendo".
+    fotosEnTexto = [ultimo[ultimo.length - 1]]
+    gruposFotos[0] = ultimo.slice(0, 2)
   }
+
+  // Las apartadas por tema se suman a lo que baje al texto.
+  fotosEnTexto = [...vanAlTextoPorTema, ...fotosEnTexto]
 
   const hojasDeFotos = gruposFotos.length
 

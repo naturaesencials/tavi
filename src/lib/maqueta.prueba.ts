@@ -134,6 +134,29 @@ console.log('\nScrapbook: nada tapa la cabecera ni se sale')
   comprobar('verticales: máximo 3 por hoja', cv.fotos.length <= 3)
   comprobar('verticales: las demás se apartan', cv.desbordadas.length === 3)
 
+
+  // El solape entre fotos nunca tapa más de un tercio de la menor.
+  {
+    const tres = [foto('a', 900, 1600), foto('b', 748, 1024), foto('c', 900, 1600)]
+    const c = componer(tres, W, H, 8)
+    let peor = 0
+    for (let i = 0; i < c.fotos.length; i++)
+      for (let j = i + 1; j < c.fotos.length; j++) {
+        const A = c.fotos[i], B = c.fotos[j]
+        const ra = (Math.abs(A.giro) * Math.PI) / 180, rb = (Math.abs(B.giro) * Math.PI) / 180
+        const aw = A.anchoMarco * Math.cos(ra) + A.altoMarco * Math.sin(ra)
+        const ah = A.anchoMarco * Math.sin(ra) + A.altoMarco * Math.cos(ra)
+        const bw = B.anchoMarco * Math.cos(rb) + B.altoMarco * Math.sin(rb)
+        const bh = B.anchoMarco * Math.sin(rb) + B.altoMarco * Math.cos(rb)
+        const acx = A.x + A.anchoMarco / 2, acy = A.y + A.altoMarco / 2
+        const bcx = B.x + B.anchoMarco / 2, bcy = B.y + B.altoMarco / 2
+        const sx = Math.min(acx + aw / 2, bcx + bw / 2) - Math.max(acx - aw / 2, bcx - bw / 2)
+        const sy = Math.min(acy + ah / 2, bcy + bh / 2) - Math.max(acy - ah / 2, bcy - bh / 2)
+        if (sx > 0 && sy > 0) peor = Math.max(peor, (sx * sy) / Math.min(aw * ah, bw * bh))
+      }
+    comprobar('el solape no supera un tercio de la foto menor', peor <= 0.37)
+  }
+
   const seisc = Array.from({ length: 6 }, (_, i) => foto(`y${i}`, 1000, 1000))
   const cc = componer(seisc, W, H, 3)
   comprobar('cuadradas: hasta 5 por hoja', cc.fotos.length === 5)

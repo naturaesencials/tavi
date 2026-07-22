@@ -7,7 +7,7 @@
  *  hoja.
  */
 
-import { techoDeResolucion, proporcion, ANCHO_MINIMO, type Pieza } from './maqueta'
+import { techoDeResolucion, techoAbsoluto, proporcion, ANCHO_MINIMO, type Pieza } from './maqueta'
 import { deLaBolsa } from './escenografia'
 
 /** Marco blanco alrededor de la foto, al estilo de una copia revelada. */
@@ -18,8 +18,9 @@ export const MARCO = { lados: 4, arriba: 4, abajo: 11 } as const
 export const AIRE = 10
 
 /** Banda superior reservada a la cabecera (encabezado, título, filete).
- *  Ninguna foto puede entrar aquí: es lo que tapaba los títulos. */
-export const BANDA_CABECERA = 42
+ *  Ninguna foto puede entrar aquí: es lo que tapaba los títulos. Se mide
+ *  desde el borde de la hoja e incluye el aire superior. */
+export const BANDA_CABECERA = 54
 
 /** Banda inferior reservada al número de página y a los dibujos del pie. */
 export const BANDA_PIE = 16
@@ -218,9 +219,12 @@ export function componer(
     if (!p) return
     const prop = proporcion(p)
 
-    // Ancho de la foto: lo que pide el hueco, pero nunca más de lo que su
-    // archivo aguanta con nitidez.
-    let ancho = Math.min(h.w * zona.ancho, techoDeResolucion(p))
+    // Ancho de la foto: lo que pide el hueco, pero limitado por la nitidez.
+    // Con una sola foto en la hoja se permite llegar hasta 200 ppp (techo
+    // absoluto) para que no quede diminuta; con varias se respeta 300.
+    const techo =
+      cabenAqui.length === 1 ? techoAbsoluto(p) : techoDeResolucion(p)
+    let ancho = Math.min(h.w * zona.ancho, techo)
     let alto = ancho / prop
 
     // Con marco incluido, la foto girada tiene que caber en el cuadrante.
@@ -268,6 +272,12 @@ export function componer(
   // La nota también vive dentro del cuadrante, en su banda inferior.
   const anchoNota = comp.nota.w * zona.ancho
   const cyNota = Math.min(comp.nota.cy, 0.96)
+
+  // Separa las fotos que se pisan más de la cuenta y las que rozan un borde.
+  // Es lo que evita que una foto vertical tape media foto de al lado o se
+  // salga: colocar por centro no bastaba.
+  separar(fotos, zona)
+
   return {
     fotos,
     nota: {
@@ -297,4 +307,133 @@ export function cupoPorForma(piezas: Pieza[]): number {
   if (cuadradas >= Math.ceil(n / 2)) return 5
   if (verticales >= Math.ceil(n / 2)) return 3
   return 4
+}
+
+/** Caja envolvente de una foto ya girada, en coordenadas de la zona. */
+function envolvente(f: Colocada) {
+  const r = (Math.abs(f.giro) * Math.PI) / 180
+  const bw = f.anchoMarco * Math.cos(r) + f.altoMarco * Math.sin(r)
+  const bh = f.anchoMarco * Math.sin(r) + f.altoMarco * Math.cos(r)
+  const cx = f.x + f.anchoMarco / 2
+  const cy = f.y + f.altoMarco / 2
+  return { cx, cy, bw, bh, x0: cx - bw / 2, y0: cy - bh / 2, x1: cx + bw / 2, y1: cy + bh / 2 }
+}
+
+/** Empuja las fotos que se solapan demasiado y las mete dentro de la zona.
+ *
+ *  Un scrapbook quiere algo de solape —esa es la gracia— pero no que una
+ *  foto tape media foto de al lado. Se permite hasta un tercio de solape
+ *  sobre la menor; más que eso, se separan. Varias pasadas porque mover una
+ *  puede acercarla a otra.
+ */
+function separar(
+  fotos: Colocada[],
+  zona: { x0: number; y0: number; ancho: number; alto: number }
+) {
+  const SOLAPE_MAX = 0.33
+  for (let pasada = 0; pasada < 12; pasada++) {
+    let movido = false
+
+    for (let i = 0; i < fotos.length; i++) {
+      for (let j = i + 1; j < fotos.length; j++) {
+        const a = envolvente(fotos[i])
+        const b = envolvente(fotos[j])
+        const solapeX = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)
+        const solapeY = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0)
+        if (solapeX <= 0 || solapeY <= 0) continue
+
+        const areaSolape = solapeX * solapeY
+        const areaMenor = Math.min(a.bw * a.bh, b.bw * b.bh)
+        if (areaSolape / areaMenor <= SOLAPE_MAX) continue
+
+        // Se separan por el eje de menor penetración, mitad cada una.
+        movido = true
+        if (solapeX < solapeY) {
+          const empuje = (solapeX - SOLAPE_MAX * Math.min(a.bw, b.bw)) / 2 + 1
+          const dir = a.cx <= b.cx ? -1 : 1
+          fotos[i].x += dir * empuje
+          fotos[j].x -= dir * empuje
+        } else {
+          const empuje = (solapeY - SOLAPE_MAX * Math.min(a.bh, b.bh)) / 2 + 1
+          const dir = a.cy <= b.cy ? -1 : 1
+          fotos[i].y += dir * empuje
+          fotos[j].y -= dir * empuje
+        }
+      }
+    }
+
+    // Cada foto, de vuelta dentro de la zona segura.
+    for (const f of fotos) {
+      const e = envolvente(f)
+      if (e.x0 < zona.x0) f.x += zona.x0 - e.x0
+      if (e.y0 < zona.y0) f.y += zona.y0 - e.y0
+      if (e.x1 > zona.x0 + zona.ancho) f.x -= e.x1 - (zona.x0 + zona.ancho)
+      if (e.y1 > zona.y0 + zona.alto) f.y -= e.y1 - (zona.y0 + zona.alto)
+    }
+
+    if (!movido) break
+  }
+
+  // Última garantía: si tras separar aún hay pares que se pisan más de la
+  // cuenta, se encogen todas un poco y se vuelve a separar. Mejor fotos algo
+  // menores que fotos montadas unas sobre otras.
+  for (let reduccion = 0; reduccion < 5; reduccion++) {
+    let peor = 0
+    for (let i = 0; i < fotos.length; i++) {
+      for (let j = i + 1; j < fotos.length; j++) {
+        const a = envolvente(fotos[i])
+        const b = envolvente(fotos[j])
+        const sx = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)
+        const sy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0)
+        if (sx > 0 && sy > 0) {
+          peor = Math.max(peor, (sx * sy) / Math.min(a.bw * a.bh, b.bw * b.bh))
+        }
+      }
+    }
+    if (peor <= 0.36) break
+
+    for (const f of fotos) {
+      const cx = f.x + f.anchoMarco / 2
+      const cy = f.y + f.altoMarco / 2
+      f.ancho *= 0.92
+      f.alto *= 0.92
+      f.anchoMarco *= 0.92
+      f.altoMarco *= 0.92
+      f.x = cx - f.anchoMarco / 2
+      f.y = cy - f.altoMarco / 2
+      f.pppFinal /= 0.92
+    }
+    // Reparto otra vez tras encoger.
+    for (let pasada = 0; pasada < 12; pasada++) {
+      let movido = false
+      for (let i = 0; i < fotos.length; i++) {
+        for (let j = i + 1; j < fotos.length; j++) {
+          const a = envolvente(fotos[i])
+          const b = envolvente(fotos[j])
+          const sx = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)
+          const sy = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0)
+          if (sx <= 0 || sy <= 0) continue
+          if ((sx * sy) / Math.min(a.bw * a.bh, b.bw * b.bh) <= 0.33) continue
+          movido = true
+          if (sx < sy) {
+            const dir = a.cx <= b.cx ? -1 : 1
+            fotos[i].x += (dir * sx) / 2 + 0.5
+            fotos[j].x -= (dir * sx) / 2 + 0.5
+          } else {
+            const dir = a.cy <= b.cy ? -1 : 1
+            fotos[i].y += (dir * sy) / 2 + 0.5
+            fotos[j].y -= (dir * sy) / 2 + 0.5
+          }
+        }
+      }
+      for (const f of fotos) {
+        const e = envolvente(f)
+        if (e.x0 < zona.x0) f.x += zona.x0 - e.x0
+        if (e.y0 < zona.y0) f.y += zona.y0 - e.y0
+        if (e.x1 > zona.x0 + zona.ancho) f.x -= e.x1 - (zona.x0 + zona.ancho)
+        if (e.y1 > zona.y0 + zona.alto) f.y -= e.y1 - (zona.y0 + zona.alto)
+      }
+      if (!movido) break
+    }
+  }
 }

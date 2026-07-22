@@ -68,7 +68,7 @@ export default function HojaFotos({
         style={{
           position: 'absolute',
           left: mm(AIRE + 6),
-          top: mm(AIRE + 2),
+          top: mm(AIRE + 12),
           width: mm(util.ancho - 40),
         }}
       >
@@ -115,7 +115,7 @@ export default function HojaFotos({
       </header>
 
       {sello ? (
-        <div style={{ position: 'absolute', right: mm(AIRE + 2), top: mm(AIRE + 4) }}>
+        <div style={{ position: 'absolute', right: mm(AIRE + 2), top: mm(AIRE + 14) }}>
           <SelloFecha linea1={sello[0]} linea2={sello[1]} papel={papel} />
         </div>
       ) : null}
