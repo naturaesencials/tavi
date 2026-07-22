@@ -17,6 +17,13 @@ export const MARCO = { lados: 4, arriba: 4, abajo: 11 } as const
  *  porque al girar una foto sus esquinas se acercan al canto del papel. */
 export const AIRE = 10
 
+/** Banda superior reservada a la cabecera (encabezado, título, filete).
+ *  Ninguna foto puede entrar aquí: es lo que tapaba los títulos. */
+export const BANDA_CABECERA = 42
+
+/** Banda inferior reservada al número de página y a los dibujos del pie. */
+export const BANDA_PIE = 16
+
 export type Hueco = {
   /** Centro, en fracción del área útil. */
   cx: number
@@ -41,100 +48,86 @@ const COMPOSICIONES: Record<number, Composicion[]> = {
   1: [
     {
       nombre: 'una-centrada',
-      huecos: [{ cx: 0.5, cy: 0.36, w: 0.82, giro: -3 }],
-      nota: { cx: 0.44, cy: 0.8, w: 0.62, giro: -2 },
+      huecos: [{ cx: 0.5, cy: 0.4, w: 0.8, giro: -3 }],
+      nota: { cx: 0.44, cy: 0.86, w: 0.62, giro: -2 },
     },
     {
       nombre: 'una-alta',
-      huecos: [{ cx: 0.46, cy: 0.42, w: 0.74, giro: 2.5 }],
-      nota: { cx: 0.56, cy: 0.86, w: 0.58, giro: 3 },
+      huecos: [{ cx: 0.47, cy: 0.42, w: 0.72, giro: 2.5 }],
+      nota: { cx: 0.56, cy: 0.88, w: 0.56, giro: 3 },
     },
   ],
   2: [
     {
       nombre: 'dos-escalera',
       huecos: [
-        { cx: 0.36, cy: 0.26, w: 0.6, giro: -4.5 },
-        { cx: 0.63, cy: 0.58, w: 0.58, giro: 3.5 },
+        { cx: 0.34, cy: 0.28, w: 0.56, giro: -4 },
+        { cx: 0.66, cy: 0.62, w: 0.54, giro: 3.5 },
       ],
-      nota: { cx: 0.34, cy: 0.85, w: 0.56, giro: -2.5 },
+      nota: { cx: 0.32, cy: 0.9, w: 0.52, giro: -2.5 },
     },
     {
       nombre: 'dos-enfrentadas',
       huecos: [
-        { cx: 0.33, cy: 0.32, w: 0.56, giro: 4 },
-        { cx: 0.68, cy: 0.34, w: 0.5, giro: -5 },
+        { cx: 0.31, cy: 0.36, w: 0.52, giro: 3.5 },
+        { cx: 0.7, cy: 0.4, w: 0.48, giro: -4.5 },
       ],
-      nota: { cx: 0.5, cy: 0.78, w: 0.66, giro: 1.5 },
+      nota: { cx: 0.5, cy: 0.86, w: 0.62, giro: 1.5 },
     },
   ],
   3: [
     {
       nombre: 'tres-abanico',
       huecos: [
-        { cx: 0.35, cy: 0.24, w: 0.56, giro: -5 },
-        { cx: 0.69, cy: 0.36, w: 0.48, giro: 4.5 },
-        { cx: 0.38, cy: 0.6, w: 0.52, giro: 6 },
+        { cx: 0.32, cy: 0.26, w: 0.5, giro: -4.5 },
+        { cx: 0.71, cy: 0.4, w: 0.44, giro: 4 },
+        { cx: 0.37, cy: 0.68, w: 0.48, giro: 5 },
       ],
-      nota: { cx: 0.66, cy: 0.82, w: 0.54, giro: -3 },
+      nota: { cx: 0.72, cy: 0.86, w: 0.46, giro: -3 },
     },
     {
       nombre: 'tres-columna',
       huecos: [
-        { cx: 0.62, cy: 0.22, w: 0.52, giro: 3 },
-        { cx: 0.34, cy: 0.45, w: 0.54, giro: -4 },
-        { cx: 0.64, cy: 0.66, w: 0.5, giro: 5 },
+        { cx: 0.63, cy: 0.22, w: 0.48, giro: 3 },
+        { cx: 0.33, cy: 0.5, w: 0.5, giro: -3.5 },
+        { cx: 0.64, cy: 0.76, w: 0.46, giro: 4.5 },
       ],
-      nota: { cx: 0.33, cy: 0.83, w: 0.52, giro: -2 },
+      nota: { cx: 0.31, cy: 0.88, w: 0.46, giro: -2 },
     },
   ],
   4: [
     {
       nombre: 'cuatro-molino',
       huecos: [
-        { cx: 0.33, cy: 0.22, w: 0.5, giro: -4.5 },
-        { cx: 0.7, cy: 0.3, w: 0.46, giro: 4 },
-        { cx: 0.31, cy: 0.55, w: 0.46, giro: 6 },
-        { cx: 0.68, cy: 0.66, w: 0.48, giro: -3 },
+        { cx: 0.31, cy: 0.22, w: 0.44, giro: -4 },
+        { cx: 0.71, cy: 0.3, w: 0.42, giro: 3.5 },
+        { cx: 0.3, cy: 0.62, w: 0.42, giro: 5 },
+        { cx: 0.7, cy: 0.72, w: 0.44, giro: -3 },
       ],
-      nota: { cx: 0.42, cy: 0.87, w: 0.5, giro: -2 },
+      nota: { cx: 0.5, cy: 0.93, w: 0.44, giro: -2 },
     },
     {
       nombre: 'cuatro-cascada',
       huecos: [
-        { cx: 0.36, cy: 0.2, w: 0.52, giro: 3.5 },
-        { cx: 0.68, cy: 0.4, w: 0.44, giro: -5 },
-        { cx: 0.34, cy: 0.55, w: 0.44, giro: -3 },
-        { cx: 0.62, cy: 0.75, w: 0.46, giro: 5 },
+        { cx: 0.34, cy: 0.2, w: 0.46, giro: 3 },
+        { cx: 0.69, cy: 0.4, w: 0.4, giro: -4.5 },
+        { cx: 0.32, cy: 0.6, w: 0.4, giro: -2.5 },
+        { cx: 0.64, cy: 0.82, w: 0.42, giro: 4.5 },
       ],
-      nota: { cx: 0.3, cy: 0.85, w: 0.44, giro: 2.5 },
+      nota: { cx: 0.3, cy: 0.92, w: 0.4, giro: 2.5 },
     },
   ],
   5: [
     {
       nombre: 'cinco-racimo',
       huecos: [
-        { cx: 0.36, cy: 0.2, w: 0.46, giro: -4 },
-        { cx: 0.71, cy: 0.26, w: 0.4, giro: 5 },
-        { cx: 0.3, cy: 0.48, w: 0.4, giro: 4.5 },
-        { cx: 0.66, cy: 0.55, w: 0.42, giro: -4.5 },
-        { cx: 0.44, cy: 0.75, w: 0.44, giro: 2.5 },
+        { cx: 0.31, cy: 0.2, w: 0.4, giro: -3.5 },
+        { cx: 0.7, cy: 0.26, w: 0.38, giro: 4.5 },
+        { cx: 0.29, cy: 0.52, w: 0.38, giro: 4 },
+        { cx: 0.68, cy: 0.6, w: 0.4, giro: -4 },
+        { cx: 0.44, cy: 0.84, w: 0.42, giro: 2.5 },
       ],
-      nota: { cx: 0.74, cy: 0.83, w: 0.4, giro: -3 },
-    },
-  ],
-  6: [
-    {
-      nombre: 'seis-rejilla-suelta',
-      huecos: [
-        { cx: 0.31, cy: 0.18, w: 0.42, giro: -4 },
-        { cx: 0.69, cy: 0.22, w: 0.4, giro: 4 },
-        { cx: 0.3, cy: 0.44, w: 0.4, giro: 5 },
-        { cx: 0.68, cy: 0.48, w: 0.38, giro: -5 },
-        { cx: 0.32, cy: 0.7, w: 0.4, giro: -3 },
-        { cx: 0.68, cy: 0.73, w: 0.4, giro: 4.5 },
-      ],
-      nota: { cx: 0.5, cy: 0.92, w: 0.46, giro: 1.5 },
+      nota: { cx: 0.76, cy: 0.9, w: 0.36, giro: -3 },
     },
   ],
 }
@@ -188,10 +181,23 @@ export function componer(
   }
   if (piezas.length === 0) return vacia
 
-  // Más de seis fotos no caben en una hoja de scrapbook sin que queden
-  // diminutas: las sobrantes pasan a una hoja de continuación.
-  const cabenAqui = piezas.slice(0, 6)
-  const desbordadas = piezas.slice(6).map((p) => p.id)
+  /* El cuadrante seguro: todo lo que va entre la cabecera y el pie. Las
+     coordenadas de las composiciones (cx, cy en fracción) se miden DENTRO de
+     este rectángulo, nunca sobre la hoja entera. Es lo que impide de raíz
+     que una foto suba a tapar el título o baje sobre el número. */
+  const zona = {
+    x0: 0,
+    y0: BANDA_CABECERA,
+    ancho: anchoUtil,
+    alto: altoUtil - BANDA_CABECERA - BANDA_PIE,
+  }
+
+  // Cuántas fotos caben con dignidad depende de su forma: las cuadradas
+  // toleran hasta cinco; las alargadas, cuatro, porque piden más sitio y al
+  // solaparse tanto dejan de leerse.
+  const maxFotos = cupoPorForma(piezas)
+  const cabenAqui = piezas.slice(0, maxFotos)
+  const desbordadas = piezas.slice(maxFotos).map((p) => p.id)
 
   const opciones = COMPOSICIONES[cabenAqui.length] ?? COMPOSICIONES[6]
   const comp = deLaBolsa(opciones, pagina, 3)
@@ -214,17 +220,17 @@ export function componer(
 
     // Ancho de la foto: lo que pide el hueco, pero nunca más de lo que su
     // archivo aguanta con nitidez.
-    let ancho = Math.min(h.w * anchoUtil, techoDeResolucion(p))
+    let ancho = Math.min(h.w * zona.ancho, techoDeResolucion(p))
     let alto = ancho / prop
 
-    // Con marco incluido, la foto girada tiene que caber en la hoja.
-    for (let intento = 0; intento < 40; intento++) {
+    // Con marco incluido, la foto girada tiene que caber en el cuadrante.
+    for (let intento = 0; intento < 60; intento++) {
       const caja = cajaGirada(
         ancho + MARCO.lados * 2,
         alto + MARCO.arriba + MARCO.abajo,
         h.giro
       )
-      if (caja.ancho <= anchoUtil && caja.alto <= altoUtil) break
+      if (caja.ancho <= zona.ancho && caja.alto <= zona.alto) break
       ancho *= 0.95
       alto = ancho / prop
     }
@@ -233,15 +239,15 @@ export function componer(
     const altoMarco = alto + MARCO.arriba + MARCO.abajo
     const caja = cajaGirada(anchoMarco, altoMarco, h.giro)
 
-    // El centro que pide la composición, corregido para que la caja girada
-    // no se salga por ningún lado.
+    // El centro que pide la composición, sujeto para que la caja girada no
+    // cruce ningún lado del cuadrante seguro.
     const cx = Math.min(
-      Math.max(h.cx * anchoUtil, caja.ancho / 2),
-      anchoUtil - caja.ancho / 2
+      Math.max(h.cx * zona.ancho, caja.ancho / 2),
+      zona.ancho - caja.ancho / 2
     )
     const cy = Math.min(
-      Math.max(h.cy * altoUtil, caja.alto / 2),
-      altoUtil - caja.alto / 2
+      Math.max(h.cy * zona.alto, caja.alto / 2),
+      zona.alto - caja.alto / 2
     )
 
     fotos.push({
@@ -250,24 +256,41 @@ export function componer(
       alto,
       anchoMarco,
       altoMarco,
-      x: cx - anchoMarco / 2,
-      y: cy - altoMarco / 2,
+      x: zona.x0 + cx - anchoMarco / 2,
+      y: zona.y0 + cy - altoMarco / 2,
       giro: h.giro,
       pppFinal: p.ancho ? (p.ancho / ancho) * 25.4 : 300,
-      limitadaPorResolucion: ancho < ANCHO_MINIMO || (p.ancho ?? 0) / ancho * 25.4 < 299,
+      limitadaPorResolucion:
+        ancho < ANCHO_MINIMO || ((p.ancho ?? 0) / ancho) * 25.4 < 299,
     })
   })
 
-  const anchoNota = comp.nota.w * anchoUtil
+  // La nota también vive dentro del cuadrante, en su banda inferior.
+  const anchoNota = comp.nota.w * zona.ancho
+  const cyNota = Math.min(comp.nota.cy, 0.96)
   return {
     fotos,
     nota: {
-      x: Math.min(Math.max(comp.nota.cx * anchoUtil - anchoNota / 2, 0), anchoUtil - anchoNota),
-      y: comp.nota.cy * altoUtil,
+      x:
+        zona.x0 +
+        Math.min(Math.max(comp.nota.cx * zona.ancho - anchoNota / 2, 0), zona.ancho - anchoNota),
+      y: zona.y0 + cyNota * zona.alto,
       ancho: anchoNota,
       giro: comp.nota.giro,
     },
     nombre: comp.nombre,
     desbordadas,
   }
+}
+
+/** Cupo de fotos por hoja según su forma predominante.
+ *
+ *  Regla del usuario: cuadradas hasta cinco; verticales u horizontales,
+ *  cuatro como mucho, para que no tengan que solaparse tanto y sigan
+ *  leyéndose. */
+function cupoPorForma(piezas: Pieza[]): number {
+  const props = piezas.map(proporcion)
+  const cuadradas = props.filter((r) => r >= 0.85 && r <= 1.18).length
+  const mayoriaCuadrada = cuadradas >= Math.ceil(piezas.length / 2)
+  return mayoriaCuadrada ? 5 : 4
 }

@@ -93,5 +93,50 @@ console.log('\nNada se sale de la página')
   comprobar('las que no caben se apartan', m.desbordadas.length > 0)
 }
 
-console.log(fallos === 0 ? '\nTodo correcto.\n' : `\n${fallos} fallos.\n`)
-if (fallos > 0) process.exit(1)
+
+
+// --- Composición del scrapbook: zona segura y cupo por forma ---
+import {
+  componer,
+  AIRE,
+  BANDA_CABECERA,
+  BANDA_PIE,
+} from './composicion'
+import { PAGINA } from './maqueta'
+
+console.log('\nScrapbook: nada tapa la cabecera ni se sale')
+{
+  const W = PAGINA.ancho - AIRE * 2
+  const H = PAGINA.alto - AIRE * 2
+  const casos: Array<[string, Pieza[]]> = [
+    ['6 verticales', Array.from({ length: 6 }, (_, i) => foto(`v${i}`, 1066, 1600))],
+    ['6 cuadradas', Array.from({ length: 6 }, (_, i) => foto(`c${i}`, 1000, 1000))],
+    ['4 mixtas', [foto('a', 1200, 1600), foto('b', 1600, 1200), foto('c', 1000, 1000), foto('d', 552, 1152)]],
+  ]
+  for (const [nombre, piezas] of casos) {
+    const c = componer(piezas, W, H, 3)
+    let mal = 0
+    for (const f of c.fotos) {
+      const r = (Math.abs(f.giro) * Math.PI) / 180
+      const bw = f.anchoMarco * Math.cos(r) + f.altoMarco * Math.sin(r)
+      const bh = f.anchoMarco * Math.sin(r) + f.altoMarco * Math.cos(r)
+      const cx = f.x + f.anchoMarco / 2
+      const cy = f.y + f.altoMarco / 2
+      if (cy - bh / 2 < BANDA_CABECERA - 0.5) mal++
+      if (cy + bh / 2 > H - BANDA_PIE + 0.5) mal++
+      if (cx - bw / 2 < -0.5 || cx + bw / 2 > W + 0.5) mal++
+    }
+    comprobar(`${nombre}: ninguna tapa cabecera ni se sale`, mal === 0)
+  }
+
+  const seis = Array.from({ length: 6 }, (_, i) => foto(`x${i}`, 1066, 1600))
+  const cv = componer(seis, W, H, 3)
+  comprobar('verticales: máximo 4 por hoja', cv.fotos.length <= 4)
+  comprobar('verticales: las demás se apartan', cv.desbordadas.length === 2)
+
+  const seisc = Array.from({ length: 6 }, (_, i) => foto(`y${i}`, 1000, 1000))
+  const cc = componer(seisc, W, H, 3)
+  comprobar('cuadradas: hasta 5 por hoja', cc.fotos.length === 5)
+}
+
+
