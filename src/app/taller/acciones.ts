@@ -115,11 +115,35 @@ export async function actualizarFicha(
     nota?: string | null
     zona_horaria?: string
     revisada?: boolean
+    pagina_id?: string | null
   }
 ) {
   const supabase = createClient()
 
   const datos: Record<string, unknown> = { ...cambios }
+
+  /* Al asignar página hay que rellenar también el álbum y el orden dentro de
+     esa página. Sin álbum la foto no aparece en ningún sitio, y sin orden se
+     colocaría siempre la primera. */
+  if ('pagina_id' in cambios) {
+    if (cambios.pagina_id) {
+      const { data: pag } = await supabase
+        .from('paginas')
+        .select('album_id')
+        .eq('id', cambios.pagina_id)
+        .single()
+      if (pag) datos.album_id = pag.album_id
+
+      const { count } = await supabase
+        .from('fotos')
+        .select('id', { count: 'exact', head: true })
+        .eq('pagina_id', cambios.pagina_id)
+      datos.orden = (count ?? 0) + 1
+    } else {
+      datos.album_id = null
+      datos.orden = null
+    }
+  }
   if ('tomada_en' in cambios && cambios.tomada_en) {
     datos.fecha_inferida_de = 'manual'
     datos.necesita_revision = false

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import Subidor from './subidor'
-import Ficha, { type FichaDatos } from './ficha'
+import Ficha, { type FichaDatos, type OpcionPagina } from './ficha'
 
 type FilaFoto = Omit<FichaDatos, 'url' | 'hora_local'> & {
   poster_ruta: string | null
@@ -35,15 +35,27 @@ export default async function Taller({
   let consulta = supabase
     .from('fotos')
     .select(
-      'id, ruta, poster_ruta, nombre_original, medio, tomada_en, fecha_inferida_de, lugar, categoria, titulo, nota, revisada, duracion_s, ancho, alto, zona_horaria'
+      'id, ruta, poster_ruta, nombre_original, medio, tomada_en, fecha_inferida_de, lugar, categoria, titulo, nota, revisada, duracion_s, ancho, alto, zona_horaria, pagina_id'
     )
     .order('tomada_en', { ascending: true, nullsFirst: false })
 
   if (filtro === 'pendientes') consulta = consulta.eq('revisada', false)
   if (filtro === 'sinfecha') consulta = consulta.is('tomada_en', null)
+  if (filtro === 'sinpagina') consulta = consulta.is('pagina_id', null)
 
   const { data } = await consulta.returns<FilaFoto[]>()
   const filas = data ?? []
+
+  // Páginas del álbum, para poder asignar cada foto a la suya.
+  const { data: paginasData } = await supabase
+    .from('paginas')
+    .select('id, orden, titulo')
+    .order('orden', { ascending: true })
+  const paginas: OpcionPagina[] = (paginasData ?? []).map((p) => ({
+    id: p.id as string,
+    orden: p.orden as number,
+    titulo: (p.titulo as string) ?? 'sin título',
+  }))
 
   const rutas = filas.map((f) => f.ruta)
   const { data: firmadas } = rutas.length
@@ -66,9 +78,15 @@ export default async function Taller({
     .from('fotos')
     .select('id', { count: 'exact', head: true })
     .is('tomada_en', null)
+  // Fotos subidas que no están en ninguna página: no salen en el álbum.
+  const { count: sinPagina } = await supabase
+    .from('fotos')
+    .select('id', { count: 'exact', head: true })
+    .is('pagina_id', null)
 
   const pestanas = [
     ['pendientes', `Por revisar (${pendientes ?? 0})`],
+    ['sinpagina', `Sin página (${sinPagina ?? 0})`],
     ['sinfecha', `Sin fecha (${sinFecha ?? 0})`],
     ['todas', `Todas (${totales ?? 0})`],
   ]
@@ -120,6 +138,7 @@ export default async function Taller({
           {filas.map((f) => (
             <Ficha
               key={f.id}
+              paginas={paginas}
               d={{
                 ...f,
                 hora_local: horaLocal(f.tomada_en, f.zona_horaria),

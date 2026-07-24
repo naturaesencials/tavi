@@ -21,7 +21,11 @@ export type FichaDatos = {
   alto: number | null
   zona_horaria: string
   hora_local: string | null
+  pagina_id: string | null
 }
+
+/** Páginas del álbum a las que se puede asignar una foto. */
+export type OpcionPagina = { id: string; orden: number; titulo: string }
 
 const CATEGORIAS = [
   ['ecografia', 'Ecografía'],
@@ -51,13 +55,20 @@ function aInput(iso: string | null) {
   return iso ? iso.slice(0, 10) : ''
 }
 
-export default function Ficha({ d }: { d: FichaDatos }) {
+export default function Ficha({
+  d,
+  paginas,
+}: {
+  d: FichaDatos
+  paginas: OpcionPagina[]
+}) {
   const [fecha, setFecha] = useState(aInput(d.tomada_en))
   const [lugar, setLugar] = useState(d.lugar ?? '')
   const [categoria, setCategoria] = useState(d.categoria ?? '')
   const [titulo, setTitulo] = useState(d.titulo ?? '')
   const [nota, setNota] = useState(d.nota ?? '')
   const [zona, setZona] = useState(d.zona_horaria)
+  const [paginaId, setPaginaId] = useState(d.pagina_id ?? '')
   const [revisada, setRevisada] = useState(d.revisada)
   const [guardado, setGuardado] = useState(false)
   const [pendiente, empezar] = useTransition()
@@ -74,6 +85,7 @@ export default function Ficha({ d }: { d: FichaDatos }) {
         titulo: titulo.trim() || null,
         nota: nota.trim() || null,
         revisada: marcarRevisada ? true : revisada,
+        pagina_id: paginaId || null,
       })
       if (!r.error) {
         if (marcarRevisada) setRevisada(true)
@@ -167,6 +179,27 @@ export default function Ficha({ d }: { d: FichaDatos }) {
         placeholder="Portland, Oregón"
         className={campo}
       />
+
+      <label className="mt-4 block text-[0.65rem] font-bold uppercase tracking-[0.14em] text-pino-claro">
+        En qué página va
+      </label>
+      {!paginaId ? (
+        <p className="mb-1 text-[0.7rem] text-ocre">
+          Sin página asignada: esta foto no aparece en el álbum.
+        </p>
+      ) : null}
+      <select
+        value={paginaId}
+        onChange={(e) => setPaginaId(e.target.value)}
+        className={`${campo} cursor-pointer`}
+      >
+        <option value="">— sin página, no sale en el álbum —</option>
+        {paginas.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.orden}. {p.titulo}
+          </option>
+        ))}
+      </select>
 
       <label className="mt-4 block text-[0.65rem] font-bold uppercase tracking-[0.14em] text-pino-claro">
         Qué es
