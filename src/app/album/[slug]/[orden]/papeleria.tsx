@@ -391,3 +391,54 @@ export function Pagina({
     </div>
   )
 }
+
+/** Etiqueta con el código QR de un vídeo.
+ *
+ *  Va sobre papel claro y con margen propio: un QR necesita zona de silencio
+ *  alrededor, y aquí el fondo es papel estampado. El tamaño no es decorativo:
+ *  el código tiene 33 módulos, así que por debajo de unos 18 mm impresos el
+ *  móvil deja de leerlo con fiabilidad. Se dibuja a 20 mm.
+ */
+export function EtiquetaQR({
+  svg,
+  papel,
+  texto = 'vídeo',
+  giro = -4,
+}: {
+  svg: string
+  papel: Papel
+  texto?: string
+  giro?: number
+}) {
+  const LADO = 20
+  const AIRE_QR = 3
+  return (
+    <div
+      style={{
+        width: mm(LADO + AIRE_QR * 2),
+        transform: `rotate(${giro}deg)`,
+        background: '#FFFDF8',
+        boxShadow: `${mm(0.5)} ${mm(0.8)} ${mm(1.6)} rgba(60,50,35,0.24)`,
+        padding: `${mm(AIRE_QR)} ${mm(AIRE_QR)} ${mm(1.5)}`,
+        boxSizing: 'border-box',
+        textAlign: 'center',
+      }}
+    >
+      <div
+        style={{ width: mm(LADO), height: mm(LADO) }}
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+      <span
+        style={{
+          display: 'block',
+          marginTop: mm(1),
+          fontSize: mm(2.4),
+          fontStyle: 'italic',
+          color: papel.suave,
+        }}
+      >
+        {texto}
+      </span>
+    </div>
+  )
+}

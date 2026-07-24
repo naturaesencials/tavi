@@ -16,6 +16,7 @@ import {
   EsquinasMontaje,
   SelloFecha,
   Dibujo,
+  EtiquetaQR,
 } from './papeleria'
 
 export default function HojaFotos({
@@ -200,6 +201,21 @@ export default function HojaFotos({
                   papel={papel}
                   giro={i % 4 === 0 ? -14 : 12}
                 />
+              </div>
+            ) : null}
+            {/* Los vídeos no se pueden imprimir: llevan su QR pegado en la
+                esquina para verlos desde el papel. */}
+            {im.medio === 'video' && im.qr ? (
+              <div
+                style={{
+                  position: 'absolute',
+                  // A la izquierda: el número de página va abajo a la
+                  // derecha y se pisarían.
+                  left: mm(-5),
+                  bottom: mm(-7),
+                }}
+              >
+                <EtiquetaQR svg={im.qr} papel={papel} giro={i % 2 ? 5 : -5} />
               </div>
             ) : null}
           </div>

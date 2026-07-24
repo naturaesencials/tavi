@@ -73,12 +73,19 @@ export default async function PaginaAlbum({
         .ficha_publica
       const qr =
         f.medio === 'video' && ficha
-          ? await QRCode.toString(`${base}/v/${ficha}`, {
-              type: 'svg',
-              margin: 0,
-              errorCorrectionLevel: 'M',
-              color: { dark: '#2E3A34', light: '#0000' },
-            })
+          ? (
+              await QRCode.toString(`${base}/v/${ficha}`, {
+                type: 'svg',
+                // Un módulo de margen: el resto de zona de silencio la pone
+                // el papel claro de la etiqueta.
+                margin: 1,
+                // Corrección media: 35 módulos, que a 20 mm impresos dan
+                // 0,57 mm por módulo y se leen de sobra. Subir a alta llevaba
+                // el código a 47 módulos y lo hacía ilegible a ese tamaño.
+                errorCorrectionLevel: 'M',
+                color: { dark: '#2E3A34', light: '#FFFDF8' },
+              })
+            ).replace('<svg', '<svg preserveAspectRatio="xMidYMid meet" width="100%" height="100%"')
           : null
       return {
         id: f.id,

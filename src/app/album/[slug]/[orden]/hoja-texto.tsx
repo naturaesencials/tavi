@@ -1,6 +1,6 @@
 import { PAGINA } from '@/lib/maqueta'
 import { papelDePliego, adornosDe, type Papel } from '@/lib/escenografia'
-import { mm, Pagina, PapelRasgado, Dibujo } from './papeleria'
+import { mm, Pagina, PapelRasgado, Dibujo, EtiquetaQR } from './papeleria'
 import type { FotoHoja } from './hoja'
 
 /** Color del post-it: un tono cálido de nota adhesiva que contraste con el
@@ -291,6 +291,7 @@ export default function HojaTexto({
                         padding: `${mm(4)} ${mm(4)} ${mm(9)}`,
                         boxSizing: 'border-box',
                         flexShrink: 0,
+                        position: 'relative',
                       }}
                     >
                       <div
@@ -315,6 +316,21 @@ export default function HojaTexto({
                           />
                         ) : null}
                       </div>
+                      {im.medio === 'video' && im.qr ? (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: mm(-5),
+                            bottom: mm(-7),
+                          }}
+                        >
+                          <EtiquetaQR
+                            svg={im.qr}
+                            papel={papel}
+                            giro={i % 2 ? 4 : -4}
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   )
                 })}
